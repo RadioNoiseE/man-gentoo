@@ -1,0 +1,845 @@
+<h1 id="gentoo-linux實用指北">Gentoo Linux實用指北</h1>
+<blockquote>
+<p>本文寫作於2024年1月，文中內容具有時效性，僅供參考。</p>
+</blockquote>
+<h2 id="關於本文">關於本文</h2>
+<p>本文是對筆者4個月來折騰Gentoo
+Linux的一個總結，包括了安裝、優化以及配置的內容。需要注意： 1.
+文中所述都是關於Amd64架構下Gentoo Linux的安裝和配置； 2. 本文不是<a
+href="https://wiki.gentoo.org/wiki/Handbook:AMD64">Gentoo
+Handbook</a>，請確保在安裝之前／之後閱讀該官方手冊（建議食用英文版、中文版部分翻譯不全且過時）；
+3.
+本文針對的是筆記本電腦安裝桌面系統，內核配置、電源管理、桌面系統安裝等部分視個人情況而定；
+4.
+筆者電腦配置爲：CPU、GPU分別爲牙膏場12代的i5和iRISxe，使用英偉達顯卡的讀者可能需要另行檢索有關信息；使用UEFI。</p>
+<h2 id="目次">目次</h2>
+<ol type="1">
+<li>基礎系統安裝
+<ul>
+<li>準備安裝環境</li>
+<li>從stage1 到stage3（可選）</li>
+<li>選擇全局配置文件並安裝基礎系統</li>
+<li>配置內核（可選）</li>
+<li>雜項、工具及系統引導</li>
+</ul></li>
+<li>系統及軟件配置
+<ul>
+<li>選取桌面系統</li>
+<li>XOrg（XMonad）</li>
+<li>Wayland（Sway）</li>
+</ul></li>
+<li>吐槽及展望</li>
+<li>參考資料和學習資料</li>
+</ol>
+<h2 id="基礎系統安裝">基礎系統安裝</h2>
+<h3 id="準備安裝環境">準備安裝環境</h3>
+<h4 id="引導">引導</h4>
+<p>爲了完成Gentoo
+Linux的安裝、首先我們肯定要製作一個系統引導盤（LiveUSB）。Gentoo
+Linux的安裝跟大部分發行版不同之處就在於它並沒有提供一個有GUI或TUI界面作爲安裝向導的引導盤。相反，爲了最大程度地客製化，它只提供了一個內置各種安裝系統必備工具的不包含圖形界面的基礎系統；我們需要在以LiveUSB啓動後<code>chroot</code>至本機磁盤手動（一般情況下）完成安裝。這種繁瑣安裝方式給予了其最大的靈活性，真正意義上的選擇之多樣是Gentoo一個非常大的優勢。</p>
+<p>我們可以從清華鏡像源處獲得LiveUSB的磁盤映像文件。官方提供了三種磁盤文件，這裏我們一般選擇<code>install-amd64-mininal</code>即可，文件地址在：</p>
+<pre><code>https://mirrors.tuna.tsinghua.edu.cn/gentoo/releases/amd64/autobuilds/current-install-amd64-minimal/.</code></pre>
+<p>隨後將該<code>iso</code>文件刻錄到U盤上（經過了Hybrid處理，可以直接刻錄到U盤上，不像FreeBSD）。這裏大家各顯神通就好。謹慎的讀者還可以校驗一下磁盤映像文件的完整性、校驗文件也在上面給出的地址下。之後將目標設備關機、插上製作好的引導盤後<strong>先關閉SecureBoot後</strong>啓動。然後你會看到OpenRC引導這Gentoo
+Linux啓動，至此我們就完成了第一步：引導。</p>
+<h4 id="連接至網絡">連接至網絡</h4>
+<p>進入LiveUSB的環境後，先運行<code>ifconfig</code>，看看除了<code>lo</code>之外是否有別的網卡設備被檢測到（比如<code>wlan</code>）。如果沒有那說明你的網卡不被支持，可以到互聯網上檢索並尋求幫助。有的話就可以運行<code>net-setup</code>（自帶的一個非常貼心的腳本），按照指引連接至網絡。如果使用<code>wlan</code>，大部分網絡都是WPA2/3，並建議讓<code>dhcp</code>決定ip地址。</p>
+<p>隨後可以<code>ping</code>一下<code>gentoo.org</code>，看看自己是否成功聯網。然後視需求編輯<code>/etc/reslov.conf</code>（可用的編輯器有nano）。</p>
+<h4 id="磁盤分區">磁盤分區</h4>
+<p>接下來是很重要的一步：給目標設備的磁盤分區。（確定你的電腦使用不是BIOS啓動，如果是請參考Handbook）一般至少需要三個分區、分別是EFI分區（512MB~1024MB）、swap分區（主要是筆記本電腦休眠時使用，一般等於你的運行時內存大小即可）以及根分區。這裏也是，大家各顯神通就好；<a
+href="https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks">這裏</a>（Introduction
+to block devices至Partitioning the disk with MBR for BIOS / legacy
+boot）有Gentoo官方給出的方案，以及分區工具<code>fdisk</code>的手把手教學可供參考。下面給出我的方案、僅供參考：</p>
+<pre class="fdisk"><code>Disk /dev/nvme0n1: 476.94 GiB, 512110190592 bytes, 1000215216 sectors
+Disk model: [.*]
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: gpt
+Disk identifier: [.*]
+
+Device            Start        End   Sectors   Size Type
+/dev/nvme0n1p1     2048    2099199   2097152     1G Linux filesystem
+/dev/nvme0n1p2  2099200    4196351   2097152     1G EFI System
+/dev/nvme0n1p3  4196352   37750783  33554432    16G Linux swap
+/dev/nvme0n1p4 37750784 1000214527 962463744 458.9G Linux filesystem</code></pre>
+<p>我額外分出了一個<code>/boot</code>分區，即<code>/dev/nvme0n1p1</code>。分完區後使用<code>fdisk -l /dev/[nvme0n1|sda|.*]</code>輸出你的分區方案，最好記錄一下，因爲之後編輯<code>/etc/fstab</code>時會用到。</p>
+<p>隨後給這幾個分區配置不同的文件系統。EFI分區須使用FAT32、其餘參考<a
+href="https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks">這裏</a>（Creating
+file systems）。這是我的方案：</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">mkfs.ext4</span> /dev/nvme0n1p1</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">mkfs.vfat</span> <span class="at">-F</span> 32 /dev/nvme0n1p2</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="ex">swapon</span> /dev/nvme0n1p3</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="ex">mkfs.btrfs</span> /dev/nvme0n1p4</span></code></pre></div>
+<p>然後掛載根目錄：</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mount</span> /dev/nvme0n1p4 /mnt/gentoo</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /mnt/gentoo</span></code></pre></div>
+<p>順便，Gentoo的LiveUSB是沒有預裝OpenZFS所需的工具的，這時候你就需要使用其它鏡像，即所謂的特殊情況；注意如果選擇了第三方的鏡像，可能會需要額外的安裝步驟，見Gentoo
+Handbook。</p>
+<h4 id="選擇stage3檔案">選擇stage3檔案</h4>
+<p>關於stage3，他們是Gentoo系統安裝的種子。這時你需要作出選擇： -
+不喜<code>systemd</code>？選擇<code>OpenRC</code>； -
+對<code>glibc</code>感到不適？選擇<code>musl-llvm</code>（注意，沒有gcc和<code>glibc</code>一堆軟件是編譯不起來的）；
+-
+被迫還妄想症？選擇<del>OpenBSD（劃掉）</del><code>hardened-selinux</code>；
+- 喜歡禁慾？選擇<code>nomultilib</code>。</p>
+<p>時辰已到，請選擇你的毒藥。stage3清單可在<a
+href="https://mirrors.tuna.tsinghua.edu.cn/gentoo/releases/amd64/autobuilds/">這裏</a>查看。</p>
+<p>作出選擇後可使用wget或cURL將其下載到<code>/mnt/gentoo</code>下：</p>
+<pre><code>wget https://mirrors.tuna.tsinghua.edu.cn/gentoo/releases/amd64/autobuilds/current-stage3-amd64-desktop-openrc/stage3-amd64-desktop-openrc-*.tar.xz</code></pre>
+<p>即可。謹慎的讀者這時又可以校驗一下磁盤映像文件的完整性。</p>
+<p>然後使用：</p>
+<pre><code>tar xpvf stage3-*.tar.xz --xattrs-include=&#39;*.*&#39; --numeric-owner</code></pre>
+<p>解壓。注意，一定要用這個命令解壓。參數解釋在Handbook中有，按需食用。</p>
+<h4 id="配置make.conf並換源">配置<code>make.conf</code>並換源</h4>
+<p>編輯<code>make.conf</code>這一十分重要的配置文件（注意，是編輯<code>/mnt/gentoo/etc/portage/make.conf</code>文件而非<code>/etc/portage/make.conf</code>），決定我們的包管理器emerge編譯時的參數等等，是十分重要的可以優化的地方。</p>
+<p>筆者將詳述一下重要的一定要配置的選項，更多敬請參考<a
+href="https://wiki.gentoo.org/wiki/Make.conf">官方指導</a>。 -
+<code>COMMON_FLAGS</code>，作爲編譯時的一般參數，必備的參數有：<code>-march=native</code>（本設備硬件）、<code>-O2</code>（官方指導優化等級）、<code>-pipe</code>（管道代替中間文件）；
+-
+<code>MAKE_OPTS</code>，一般用來設定make時的並行數，一般是中央處理器核心數的1/2；
+-
+<code>CPU_FLAGS_X86</code>，使用<code>cpuid2cpuflags</code>工具獲得（須<code>chroot</code>後用包管理器取得），爲處理器優化可執行文件中使用的指令；
+-
+<code>PORTAGE_TMPDIR</code>，包管理器後端存放中間文件的地方，內存大於16GB的建議設爲<code>/tmp</code>、將其置於內存中，加快編譯速度並減少對硬盤的大量讀寫、延長其使用壽命；
+-
+<code>ACCEPT_LICENSE</code>，安裝軟件接受的許可證類型，官方提供了幾個集合，但像筆者這種沒什麼節操的當然是用<code>*</code>全部接受了；
+-
+<code>ACCEPT_KEYWORDS</code>，選擇你安裝的軟件是使用穩定版本（amd64）還是激進版本（~amd64），後續是可以單獨選擇該軟件使用何種版本的。</p>
+<p>筆者的配置也放出來供參考：</p>
+<pre class="conf"><code>COMMON_FLAGS=&quot;-march=native -O2 -pipe -finline-functions -fomit-frame-pointer&quot;
+CFLAGS=&quot;${COMMON_FLAGS}&quot;
+CXXFLAGS=&quot;${COMMON_FLAGS}&quot;
+FCFLAGS=&quot;${COMMON_FLAGS}&quot;
+FFLAGS=&quot;${COMMON_FLAGS}&quot;
+LDFLAGS=&quot;${COMMON_FLAGS} -Wl,-O2 -Wl,--as-needed -Wl,--hash-style=gnu -Wl,--sort-common -Wl,--strip-all&quot;
+LC_MESSAGES=C.utf8
+MAKEOPTS=&quot;-j8 -l8&quot;
+CPU_FLAGS_X86=&quot;aes avx avx2 f16c fma3 mmx mmxext pclmul popcnt rdrand sha sse sse2 sse3 sse4_1 sse4_2 ssse3&quot;
+PORTAGE_TMPDIR=&quot;/tmp&quot;
+AUTO_CLEAN=&quot;yes&quot;
+ACCEPT_LICENSE=&quot;*&quot;
+ACCEPT_KEYWORDS=&quot;amd64&quot;
+L10N=&quot;en-US en&quot;
+LINGUAS=&quot;en-US en&quot;
+GRUB_PLATFORMS=&quot;efi-64&quot;
+VIDEO_CARDS=&quot;intel&quot;
+ALSA_CARDS=&quot;hda-intel&quot;
+# INPUT_DEVICES=&quot;libinput synaptics&quot;
+LLVM_TARGETS=&quot;X86&quot;
+USE=&quot;pulseaudio vulkan wayland cjk iwd -kde -gnome&quot;
+GENTOO_MIRRORS=&quot;https://mirrors.tuna.tsinghua.edu.cn/gentoo&quot;</code></pre>
+<p>隨後可以換個源（雖然來說默認的也沒有被牆、而且Gentoo安裝包由於是下載源碼然後編譯、與二進制發行版相比對網絡的要求更低、不換也可以）。
+對於<code>make.conf</code>，可以使用官方提供的工具<code>mirrorselect</code>：</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">mirrorselect</span> <span class="at">-i</span> <span class="at">-o</span> <span class="op">&gt;&gt;</span> /mnt/gentoo/etc/portage/make.conf</span></code></pre></div>
+<p>以TUI的方式選擇鏡像，也可以直接在<code>make.conf</code>中加上一行：</p>
+<pre><code>GENTOO_MIRRORS=&quot;https://mirrors.tuna.tsinghua.edu.cn/gentoo&quot;</code></pre>
+<p>還需換源的文件爲<code>/mnt/gentoo/etc/portage/repos.conf/gentoo.conf</code>，該文件指定了包管理器emerge使用的倉庫地址。該文件缺省設置在<code>/mnt/gentoo/etc/portage/config/repos.conf</code>，用：</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cp</span> /mnt/gentoo/usr/share/portage/config/repos.conf /mnt/gentoo/user/portage/repos.conf/gentoo</span></code></pre></div>
+<p>創建後按<a
+href="https://mirrors.tuna.tsinghua.edu.cn/help/gentoo-portage/">指南</a>修改<code>sync-uri</code>即可。</p>
+<h4 id="chroot"><code>chroot</code></h4>
+<p>終於可以chroot了。爲了在chroot環境中使用emerge從互聯網上獲取軟件包，將DNS信息複製一下：</p>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cp</span> <span class="at">--dereference</span> /etc/resolv.conf /mnt/gentoo/etc/</span></code></pre></div>
+<p>這時建議同步一下電腦的時鐘，若誤差太多可能會影響後續emerge的同步校驗：</p>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="ex">chronyd</span> <span class="at">-q</span></span></code></pre></div>
+<p>然後使用官方提供的腳本，隨後載入設置並設置一個招搖的提示幅：</p>
+<div class="sourceCode" id="cb13"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="ex">arch-chroot</span> /mnt/gentoo</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="bu">source</span> /etc/profile</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">PS1</span><span class="op">=</span><span class="st">&quot;(chroot) </span><span class="va">${PS1}</span><span class="st">&quot;</span></span></code></pre></div>
+<p>別忘了把一開始分出來的EFI分區掛載一下，對筆者來說是：</p>
+<div class="sourceCode" id="cb14"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mount</span> /dev/nvme0n1p1 /boot</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> /boot/efi</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="fu">mount</span> /dev/nvme0n1p2 /boot/efi</span></code></pre></div>
+<p>現在，你已經成功地進入到新環境了。</p>
+<h3 id="bootstrap可選">BootStrap（可選）</h3>
+<p>這時，我們處在了一個由先前下載並解壓的stage3構建的一個基礎系統中。它包括了標準庫、編譯器等Linux系統的必要組成部分，是由Gentoo
+Release Engineering
+Team（好高級的名字、發行工程誒）幫我們預先編譯好的。根據<a
+href="https://wiki.gentoo.org/wiki/FAQ">FAQ</a>，從頭至尾構建這些所得的收益並不會很大，而所花的時間非常長，特別是如果你的gcc像筆者一樣開啓了<code>lto</code>、<code>pgo</code>等特性，對於一般電腦至少需要4小時（甚至gcc就要編譯至少3次［至少是因爲，如果你的gcc開了<code>pgo</code>、那麼就需要重複編譯5次］）。故讀者需要明智地選擇是否進行這一步。若不需要則<strong>直接</strong>進入下一部分『選擇全局配置文件並安裝基礎系統』即可。選擇該部分的讀者在下一部分可忽略重複步驟（筆者將會指明）。</p>
+<p>首先我們先同步一下本機的包管理器數據庫（其實就是一個在<code>/var/db/repos/</code>下的一堆文件）：</p>
+<div class="sourceCode" id="cb15"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">--sync</span></span></code></pre></div>
+<p>隨後選取你要使用的基礎系統配置文件，他們是Gentoo系統構建的磚塊。（根據Handbook，）它不僅幫你決定了<code>USE</code>、<code>CFLAGS</code>等的值，更限定了系統上軟件包的版本。根據你在選stage3時和實際需求選擇即可。使用：</p>
+<div class="sourceCode" id="cb16"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> profile list</span></code></pre></div>
+<p>列出可選的配置後運行：</p>
+<div class="sourceCode" id="cb17"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="ex">eselect</span> profile set [num]</span></code></pre></div>
+<p>應用。<a
+href="https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Base">這裏</a>的Choosing
+the right profile一節有更多相關信息。</p>
+<h4 id="從stage1-到stage2">從stage1 到stage2</h4>
+<p>官方提供了一個腳本，我們只需要運行它即可：</p>
+<div class="sourceCode" id="cb18"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /var/db/repos/gentoo/scripts</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./bootstrap.sh</span></span></code></pre></div>
+<h4 id="從stage2到stage3">從stage2到stage3</h4>
+<p>理論上按照Gentoo官方的說法，這一步只需要<code>emerge -e @system</code>構建系統工具鏈即可。然而由於那個bootstrap.sh腳本估計是沒怎麼維護了，出來的gcc編譯器缺少構建系統所需的一個特性、需要手動使用<code>USE=openmp</code>開啓。這一步你也可以配置更多gcc的特性，詳見<a
+href="https://wiki.gentoo.org/wiki/GCC">這裏</a>。爲了開啓這些特性，我們需要在<code>/etc/portage/package.use/</code>目錄下創建一個文件（文件名無所謂，但爲了可維護性有兩種廣泛使用的方案：創建一個文件存放所有軟件的<code>USE</code>配置和爲每一個需要配置的軟件創建一個新文件），並寫入：</p>
+<pre><code>sys-devel/gcc openmp</code></pre>
+<p>即可。（如果軟件名沒有重疊，你也可以省去類名直接寫gcc。）</p>
+<p>隨後使用新的配置重新編譯gcc：</p>
+<div class="sourceCode" id="cb20"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">--oneshot</span> sys-devel/gcc</span></code></pre></div>
+<p>漫長的等待過後，我們再運行；</p>
+<div class="sourceCode" id="cb21"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">-e</span> @system</span></code></pre></div>
+<p>即可重構系統的底層依賴。至此我們就完成了從stage1到stage3的構建，可喜可賀、可喜可賀。</p>
+<p>由於我們已經選取過了系統的全局配置（那個profile），可以越過下一章開頭的選取部分。</p>
+<h3 id="安裝系統">安裝系統</h3>
+<h4
+id="同步包管理器數據庫並選取全局配置文件">同步包管理器數據庫並選取全局配置文件</h4>
+<p>首先同步包管理器所使用的軟件包數據庫（其實這一步就是下載放在不同文件夾裏的ebuild文件）：</p>
+<pre><code>emerge --sync</code></pre>
+<p>現在需要選取系統配置文件，參考官方<a
+href="https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Base">學習資料</a>中Choosing
+the right profile一節，列出並選擇：</p>
+<div class="sourceCode" id="cb23"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> profile list</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> profile set [num]</span></code></pre></div>
+<h4 id="配置make.conf文件">配置<code>make.conf</code>文件</h4>
+<p>這時我們接着配置這個文件。先前由於沒有<code>cpuid2cpuflags</code>這個工具，無法配置該環境變量，現在我們只需：</p>
+<div class="sourceCode" id="cb24"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">--oneshot</span> <span class="at">--ask</span> app-portage/cpuid2cpuflags <span class="co"># 安裝</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="ex">cpuid2cpuflags</span> <span class="co"># 輸出</span></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">-c</span> app-portage/cpuid2cpuflags <span class="co"># 過河拆橋</span></span></code></pre></div>
+<p>即可。</p>
+<p>然後配置顯卡（一些軟件如mesa可能會用到該變量）：</p>
+<div class="sourceCode" id="cb25"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;VIDEO_CARDS=</span><span class="dt">\&quot;</span><span class="st">intel</span><span class="dt">\&quot;</span><span class="st">&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/make.conf</span></code></pre></div>
+<p>怎麼指導我的設備該填寫怎樣的值，需要怎樣的配置呢？<a
+href="https://wiki.gentoo.org/wiki/AMDGPU">AMD</a>、<a
+href="https://wiki.gentoo.org/wiki/Intel">Intel</a>、Nvidia<a
+href="https://wiki.gentoo.org/wiki/Nouveau">開源</a>和<a
+href="https://wiki.gentoo.org/wiki/NVIDIA">閉源</a>。（還是老黃有牌面。）</p>
+<h4 id="重建系統可選">重建系統（可選）</h4>
+<p>這一步是可選的，且只在你做出了： 1.
+修改全局的<code>USE</code>旗標後； 2.
+出爾反爾、做出了跟你在選取stage3文件時截然相反地選擇（比如從OpenRC投向了Systemd）；
+3. 不趕時間、生活比較從容
+時纔會帶來好處。如果你趕時間，即使你做出了1、2中的行爲也可以閒適自得地跳過這步，因爲可能會需要一段等待的時間。</p>
+<p>如果堅定信念決定重建，執行：</p>
+<div class="sourceCode" id="cb26"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">-avuDN</span> @world</span></code></pre></div>
+<p>然後按下回車就好。等emerge幹好了工作，再用：</p>
+<div class="sourceCode" id="cb27"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">--ask</span> <span class="at">--depclean</span></span></code></pre></div>
+<p>移除不被依賴的軟件包（這步十分殘忍、請確認後再確認）。</p>
+<h4 id="本地化">本地化</h4>
+<p>從這一節開始，就需要區分OpenRC和Systemd各自的步驟。筆者用的是OpenRC，使用Systemd的用家可以從<a
+href="https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Base">這裏</a>的Optional:
+Using systemd as the system and service
+manager處開始按步驟使用不同的命令完成安裝（兩種方案在安裝時只會有細節上的區別）。</p>
+<p>首先我們設定時區，使用以下命令查看可用時區：</p>
+<div class="sourceCode" id="cb28"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ls</span> <span class="at">-l</span> /usr/share/zoneinfo</span></code></pre></div>
+<p>所謂時區其實就是這個目錄下的目錄中細分的文件，非常符合所謂的Unix哲學、這很好。然後應用：</p>
+<div class="sourceCode" id="cb29"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;Asia/Shanghai&quot;</span> <span class="op">&gt;</span> /etc/timezone</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">--config</span> sys-libs/timezone-data</span></code></pre></div>
+<p>接着我們設置本地語言環境（locale），修改（取消註釋）<code>/etc/locale.gen</code>文件即可。編輯修改該文件後、應用：</p>
+<div class="sourceCode" id="cb30"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="fu">nano</span> /etc/locale.gen <span class="co"># 修改文件</span></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a><span class="ex">locale-gen</span> <span class="co"># 生成</span></span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a><span class="ex">eselect</span> locale list <span class="co"># 列出可選的本地語言環境</span></span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a><span class="ex">eselect</span> locale set [num] <span class="co"># 選取你需要的環境</span></span></code></pre></div>
+<p>最後我們使上述配置生效：</p>
+<div class="sourceCode" id="cb31"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="ex">env-update</span> <span class="kw">&amp;&amp;</span> <span class="bu">source</span> /etc/profile <span class="kw">&amp;&amp;</span> <span class="bu">export</span> <span class="va">PS1</span><span class="op">=</span><span class="st">&quot;(chroot) </span><span class="va">${PS1}</span><span class="st">&quot;</span></span></code></pre></div>
+<h3 id="配置系統內核手動配置可選">配置系統內核（手動配置可選）</h3>
+<p>終於到了配置內核的時候。有三種方案供各位選擇： 1.
+用發行版內核、發行版內核不會針對你的設備作任何修改、但主打的一個省心方便且快捷，官方甚至貼心地提供了編譯好的內核、將會在下文提到；
+2.
+用混合驅動模式、使用官方提供的genkernel工具、能夠自己配置內核、但對一些後續的擴展來說不是很方便（比如你想打一個cjkTTY補丁或者想用plymouth配置Boot
+Splash）、好處大概在於自動化； 3. 手動編譯、即下文主要講的方案。</p>
+<h4 id="必要驅動安裝">必要驅動安裝</h4>
+<p>這一步是無論你使用什麼內核安裝方式都需要完成的。我使用emerge提供的集合方式安裝（便於管理）。先創建目錄：</p>
+<div class="sourceCode" id="cb32"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> /etc/portage/sets</span></code></pre></div>
+<p>這個目錄就是我們存放所有集合文件的地方。隨後在該目錄下創建一個文件、文件名隨意、但最好跟該集合包含的包有關。比如爲了存放驅動，我們創建一個名爲<code>firmware</code>的文件並在其中寫入要安裝的包：</p>
+<div class="sourceCode" id="cb33"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="fu">touch</span> /etc/portage/sets/firmware</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;sys-kernel/linux-firmware&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/firmware <span class="co"># 需安裝的linux-firmware包</span></span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;sys-firmware/sof-firmware&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/firmware <span class="co"># 需安裝的sof-firmware包（聲卡驅動）</span></span></code></pre></div>
+<p>隨後使用：</p>
+<div class="sourceCode" id="cb34"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">--ask</span> @firmware</span></code></pre></div>
+<p>即可安裝linux-firmware和sof-firmware兩個包。如果不使用集合的方式，則將<code>@firmware</code>替換爲兩個包的名字即可（不需要<code>@</code>）。</p>
+<h4 id="發行版內核安裝">發行版內核安裝</h4>
+<p>以下是使用GNU GRUB作爲系統引導時的安裝步驟，如果有特殊需求參考<a
+href="https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Kernel">這裏</a>的Distribution
+kernels一節即可。</p>
+<p>首先我們要安裝installkernel這個包。如果你有在內核升級後自動幫你運行<code>grub-mkconfig</code>指令的話，需要打開該包的<code>grub</code>特性：</p>
+<div class="sourceCode" id="cb35"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="fu">touch</span> /etc/portage/package.use/installkernel</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;sys-kernel/installkernel grub&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/package.use/installkernel</span></code></pre></div>
+<p>隨後創建kernel集合：</p>
+<div class="sourceCode" id="cb36"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="fu">touch</span> /etc/portage/sets/kernel</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;sys-kernel/installkernel&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/kernel <span class="co"># 需安裝的installkernel包</span></span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;sys-kernel/gentoo-kernel&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/kernel <span class="co"># 需安裝的gentoo-kernel包（如果不想本機編譯內核、安裝gentoo-kernel-bin即可）</span></span></code></pre></div>
+<p>然後就安裝。發行版內核很大，你需要等一等。</p>
+<div class="sourceCode" id="cb37"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">--ask</span> @kernel</span></code></pre></div>
+<h4 id="手動編譯內核">手動編譯內核</h4>
+<p>同樣創建kernel集合先安裝需要的包：</p>
+<div class="sourceCode" id="cb38"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="fu">touch</span> /etc/portage/sets/kernel</span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;sys-kernel/gentoo-sources&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/kernel <span class="co"># 內核源文件</span></span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;sys-kernel/dracut&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/kernel <span class="co"># initramfs</span></span></code></pre></div>
+<p>Gentoo提供了許多內核，比如沒有對Gentoo進行適配的vanilla、性能優化的zen、以及其他的分支，根據喜好／需求選擇即可。至於用來生成initramfs的dracut，也可以用官方的genkernel替代；但需要注意的是genkernel至今爲提供對plymouth的支持。</p>
+<p>使用<code>emerge -a @kernel</code>安裝後，即可開始配置：</p>
+<div class="sourceCode" id="cb39"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /usr/src/linux-6.1.67-gentoo/ <span class="co"># 最後的文件夾名會根據你所安裝內核及版本有所區別</span></span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> menuconfig <span class="co"># 基於curces的菜單式配置界面</span></span></code></pre></div>
+<p>關於內核配置，我不推薦使用<code>make localyesconfig</code>的方式，因爲這種方式只會將正在使用的驅動改成<code>yes</code>（嵌入），建議只做爲參考。在配置顯卡／聲卡／網卡的驅動時，不建議嵌入、而作爲模塊載入。否則可能導致找不到網卡、無聲音、mpv報錯等問題。關於內核各個選項的意義、推薦閱讀金步國的<a
+href="https://www.jinbuguo.com/kernel/longterm-linux-kernel-options.html">Linux-4.4-x86_64内核配置选项简介</a>，然後對照着配置就好。遇到不明白的就善用搜索。同時，在<a
+href="https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Kernel">官方文檔</a>的Alternative:
+Manual configuration一章中有關於內核必須的配置提示及警告。Gentoo
+Wiki上也會寫出一些對內核有特殊要求的包對應的配置要求，需要特別注意。比如這是iwd（<code>wpa_supplicant</code>的現代替代）所需的內核配置，寫的十分詳細：</p>
+<pre class="kernel"><code>Security options  ---&gt;
+    [*] Enable access key retention support
+    [*] Diffie-Hellman operations on retained keys
+Networking support  ---&gt;
+    [*] Wireless  ---&gt;
+        &lt;M&gt; cfg80211 - wireless configuration API
+Cryptographic API  ---&gt;
+    *** Public-key cryptography ***
+    [*] RSA algorithm
+    [*] Diffie-Hellman algorithm
+    *** Block modes ***
+    [*] ECB support
+    *** Hash modes ***
+    [*] HMAC support
+    *** Digest ***
+    [*] MD4 digest algorithm
+    [*] MD5 digest algorithm
+    [*] SHA1 digest algorithm
+    [*] SHA1 digest algorithm (SSSE3/AVX/AVX2/SHA-NI)   // AMD64 and SSSE3
+    [*] SHA224 and SHA256 digest algorithm
+    [*] SHA256 digest algorithm (SSSE3/AVX/AVX2/SHA-NI) // AMD64 and SSSE3
+    [*] SHA384 and SHA512 digest algorithms
+    [*] SHA512 digest algorithm (SSSE3/AVX/AVX2)        // AMD64 and SSSE3
+    *** Ciphers **
+    [*] AES cipher algorithms
+    [*] AES cipher algorithms (x86_64)                  // AMD64
+    [*] AES cipher algorithms (AES-NI)                  // X86_AES
+    [*] ARC4 cipher algorithm
+    [*] DES and Triple DES EDE cipher algorithms
+    [*] Triple DES EDE cipher algorithm (x86-64)        // AMD64
+    *** Random Number Generation ***
+    [*] User-space interface for hash algorithms
+    [*] User-space interface for symmetric key cipher algorithms
+    [*] Asymmetric (public-key cryptographic) key type  ---&gt;
+        [*] Asymmetric public-key crypto algorithm subtype
+        [*] X.509 certificate parser
+        [*] PKCS#7 message parser
+        &lt;M&gt; PKCS#8 private key parser                   // linux kernel 4.20 or higher</code></pre>
+<p>所以在手動配置內核所能帶來的精簡之外，安裝軟件時便可能需要額外的折騰，比如iptables、這個東西需要的內核配置特別多，但想要在QEMU里玩遊戲還必須配置。如果你的筆記本電腦需要能用的電源管理，別忘了看<a
+href="https://wiki.gentoo.org/wiki/Power_management/Guide">這篇電源管理</a>（建議別現麻煩，把<code>thermald</code>配一下）和<a
+href="https://wiki.gentoo.org/wiki/Suspend_and_hibernate">這篇關於休眠</a>的文章。同時也注意一下時鐘滴答、頻率這些對性能影響較大的選項。</p>
+<p>在大顯神通之後，想必各位也完成了配置。推出menuconfig界面並保存之後，你的配置會被寫入當前目錄下的<code>.config</code>文件中。接下來使用：</p>
+<div class="sourceCode" id="cb41"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> <span class="at">-j11</span> <span class="co"># 根據自己硬件調整</span></span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> modules_install</span>
+<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> install</span>
+<span id="cb41-4"><a href="#cb41-4" aria-hidden="true" tabindex="-1"></a><span class="ex">dracut</span> <span class="at">--force</span> <span class="at">--hostonly</span> <span class="co"># 生成initramfs，如果你在內核中配置了支持的壓縮方式，別忘了指定，如 --xz</span></span></code></pre></div>
+<p>最後別忘記：</p>
+<div class="sourceCode" id="cb42"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="ex">eselect</span> kernel list <span class="co"># 查看可用內核</span></span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a><span class="ex">eselect</span> kernel set [num] <span class="co"># 選取</span></span></code></pre></div>
+<h3 id="雜項工具及系統引導">雜項、工具、及系統引導</h3>
+<h4 id="fstab文件">fstab文件</h4>
+<p>爲了讓系統知道該掛載硬盤的哪個分區、每個分區上裝的是什麼東西、用的是什麼文件系統、掛載時需要什麼參數、以及掛載的行爲、優先級等，需要編輯<code>/etc/fstab</code>文件。具體的語法請看<a
+href="https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/System">這裏</a>的About
+fstab一節。下面是我的配置，供參考：</p>
+<pre class="fstab"><code>/dev/nvme0n1p1    /boot        ext4    defaults        1    2
+/dev/nvme0n1p2    /boot/efi    vfat    defaults        0    2
+/dev/nvme0n1p3    none         swap    sw              0    0
+/dev/nvme0n1p4    /            btrfs   compress=zstd:2 0    1</code></pre>
+<p>這個文件比較重要，千萬別手抖。</p>
+<h4 id="網絡相關">網絡相關</h4>
+<p>我們先給自己的機器設一個主機名（注意：如果你在內核里指定了就不要衝突）：</p>
+<div class="sourceCode" id="cb44"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> gentoo <span class="op">&gt;</span> /etc/hostname</span></code></pre></div>
+<p>隨後安裝一個網絡管理器。一般常用的是NetworkManager（如果你要用Gnome必裝、KDE考慮、xfce謹慎、對於WM來說就太重了），還有就是Gentoo自己的netifrc、ConnMan這些。我用的是iwd，單獨使用需開啓<code>standalone</code>特性：</p>
+<div class="sourceCode" id="cb45"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a><span class="fu">touch</span> /etc/portage/package.use/iwd</span>
+<span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;net-wireless/iwd client monitor standalone&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/package.use/iwd</span>
+<span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">-a</span> iwd <span class="co"># 我使用集合來管理，但爲了命令精簡往後一次只需安裝單個包時會直接安裝</span></span></code></pre></div>
+<p>隨後編輯<code>/etc/iwd/main.conf</code>文件：</p>
+<pre class="conf"><code># /etc/iwd/main.conf
+
+[General]
+EnableNetworkConfiguration=true
+[Network]
+NameResolvingService=resolvconf</code></pre>
+<p>最後使其開機自啓：</p>
+<div class="sourceCode" id="cb47"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a><span class="ex">rc-update</span> add iwd default</span></code></pre></div>
+<p>也推薦Gentoo自己的netifrc、但是就是說我嫌<code>net.wlan0</code>太醜了（其他都是什麼<code>local</code>、<code>consolefont</code>、<code>tlp</code>，風格完全不統一啊）。</p>
+<p>然後各位視需求編輯一下<code>/etc/hosts</code>文件即可。</p>
+<div class="sourceCode" id="cb48"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="fu">nano</span> /etc/hosts <span class="co"># 預裝的編輯器是nano、覺得苦手可以用emerge裝來用</span></span></code></pre></div>
+<h4 id="系統信息">系統信息</h4>
+<p>首先設置root賬戶的密碼（弱密碼會提醒）：</p>
+<div class="sourceCode" id="cb49"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a><span class="fu">passwd</span></span></code></pre></div>
+<p>隨後配置一下OpenRC，比如看看自己要不要開一個parallel什麼的（我覺得意義不是很大）：</p>
+<div class="sourceCode" id="cb50"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a><span class="fu">nano</span> /etc/rc.conf</span></code></pre></div>
+<p>由於大部分在大陸買的電腦鍵盤盤佈局是標準的US佈局，就不需要管<code>/etc/conf.d/keymap</code>。但需要注意的是硬件時鐘，用<code>date</code>命令看看是不是UTC，如果不是就需要在<code>/etc/conf.d/hwclock</code>里設置<code>clock="local"</code>。</p>
+<h4 id="系統工具">系統工具</h4>
+<p>先安裝系統日誌管理，可選的有sysklogd、syslogng和metalog。</p>
+<div class="sourceCode" id="cb51"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">-a</span> app-admin/syslog-ng</span></code></pre></div>
+<p>隨後Handbook上建議安裝一個Cron
+Daemon（定時規劃任務）、這個我覺得沒必要手動裝，你在安裝一些需要用到該功能的包時會自動把它作爲依賴裝上的。可選的有cronie、dcron、fcron和bcron。</p>
+<p>如果你打算就用默認的bash、裝一個自動補全會極大提升你的使用體驗：</p>
+<div class="sourceCode" id="cb52"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">-a</span> app-shells/bash-completion</span></code></pre></div>
+<p>如果你希望（在啓動時）同步硬件時鐘：</p>
+<div class="sourceCode" id="cb53"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">-a</span> net-misc/ntp <span class="co"># 常用的還有chrony等</span></span>
+<span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a><span class="ex">rc-update</span> add ntp-client default</span></code></pre></div>
+<p>最後針對你選取的文件系統，需要安裝其常用工具：</p>
+<div class="sourceCode" id="cb54"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a><span class="fu">touch</span> /etc/portage/sets/fs <span class="co"># fs集合</span></span>
+<span id="cb54-2"><a href="#cb54-2" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;sys-fs/e2fsprogs&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/fs <span class="co"># ext4用</span></span>
+<span id="cb54-3"><a href="#cb54-3" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;sys-fs/dosfstools&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/fs <span class="co"># vFAT用</span></span>
+<span id="cb54-4"><a href="#cb54-4" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;sys-fs/btrfs-progs&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/fs <span class="co"># btrfs用</span></span>
+<span id="cb54-5"><a href="#cb54-5" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">--ask</span> @fs <span class="co"># 安裝</span></span></code></pre></div>
+<p>除非你是root敢死隊、不然還是裝一個doas／sudo比較好。我用doas，因爲我是個人筆記本電腦，完全用不到sudo的那麼多功能：</p>
+<div class="sourceCode" id="cb55"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">-a</span> app-admin/doas</span></code></pre></div>
+<p>然後根據<a href="https://wiki.gentoo.org/wiki/Doas">Gentoo
+Wiki</a>，創建一個安全的配置文件後配置doas：</p>
+<div class="sourceCode" id="cb56"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a><span class="fu">touch</span> /etc/doas.conf</span>
+<span id="cb56-2"><a href="#cb56-2" aria-hidden="true" tabindex="-1"></a><span class="fu">chown</span> <span class="at">-c</span> root:root /etc/doas.conf</span>
+<span id="cb56-3"><a href="#cb56-3" aria-hidden="true" tabindex="-1"></a><span class="fu">chmod</span> <span class="at">-c</span> 0400 /etc/doas.conf</span></code></pre></div>
+<p>然後將對doas的配置寫在剛創建的<code>/etc/doas.conf</code>文件中即可：</p>
+<div class="sourceCode" id="cb57"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a><span class="ex">permit</span> nopass :wheel <span class="co"># 危險，除非你知道你在做什麼，否則不要照抄</span></span></code></pre></div>
+<p>因爲除了我之外不會有人碰我電腦，我也不是Linux運維什麼的，所以的設置的是只要用戶在wheel組里無需密碼就可以用doas獲得root權限。</p>
+<p>最後如果你希望你的開機界面好看一點、可以安裝plymouth：</p>
+<div class="sourceCode" id="cb58"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a><span class="fu">touch</span> /etc/portage/sets/bootsplash <span class="co"># bootsplash集合</span></span>
+<span id="cb58-2"><a href="#cb58-2" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;sys-boot/plymouth&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/bootsplash <span class="co"># 本體</span></span>
+<span id="cb58-3"><a href="#cb58-3" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;sys-boot/plymouth-openrc-plugin&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/bootsplash <span class="co"># 交合用</span></span></code></pre></div>
+<p>這時如果你選了<code>amd64</code>的穩定版，你可能會發現它被mask了。使用：</p>
+<div class="sourceCode" id="cb59"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a><span class="fu">touch</span> /etc/portage/package.accept_keywords/bootsplash</span>
+<span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">-a</span> @bootsplash <span class="at">--autounmask-write</span> <span class="at">--autounmask</span></span>
+<span id="cb59-3"><a href="#cb59-3" aria-hidden="true" tabindex="-1"></a><span class="fu">mv</span> /etc/portage/package.accept_keywords/._<span class="pp">*</span>bootsplash /etc/portage/package.accept_keywords/bootsplash <span class="co"># 如果你想把所有需要unmask的放在一個文件里，那麼也可以把這一步替換爲dispatch-conf</span></span></code></pre></div>
+<p>常用的unmask的工具是<code>dispatch-conf</code>，但有時候會在決定該將更新的規則寫入哪個文件時犯錯誤，所以上面提供了另一種思路。順便，它默認的diff是沒有顏色區分的，這不好；於是我們修改<code>/etc/dispatch-conf.conf</code>文件中的一行爲：</p>
+<pre><code>diff=&quot;diff --color=always -Nu &#39;%s&#39; &#39;%s&#39;&quot;</code></pre>
+<p>就好了。你還可以選擇其它的diff工具，但完全沒必要（這些自動生成的規則能有多複雜）。</p>
+<p>回到plymouth，執行一下命令來選擇你需要使用的啓動畫面：</p>
+<div class="sourceCode" id="cb61"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb61-1"><a href="#cb61-1" aria-hidden="true" tabindex="-1"></a><span class="ex">plymouth-set-default-theme</span> <span class="at">-l</span></span></code></pre></div>
+<p>然後選擇你要使用的後重新生成initramfs：</p>
+<div class="sourceCode" id="cb62"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a><span class="ex">plymouth-set-default-theme</span> details</span>
+<span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a><span class="ex">dracut</span> <span class="at">--force</span> <span class="at">--hostonly</span></span></code></pre></div>
+<p>像我這樣選了純文本界面的，可能會有配置終端字體的需求。在<code>/etc/conf.d/consolefont</code>文件中修改<code>consolefont</code>爲你喜歡的字體（注意看註釋）：</p>
+<pre><code>consolefont=&quot;sun12x22&quot;</code></pre>
+<p>然後讓它開機自啓：</p>
+<div class="sourceCode" id="cb64"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="ex">rc-update</span> add consolefont default</span></code></pre></div>
+<p>至於我爲什麼要用plymouth專門模擬OpenRC啓動時的默認行爲，因爲它原生的界面可能會對不齊（因爲它認爲屏幕的大小變化了）。</p>
+<h4 id="系統引導">系統引導</h4>
+<p>最後一步就是安裝系統引導了。這裏不說使用efibootmgr、也不講Secure
+Boot，只說最標準的GRUB2引導（我覺得我已經寫不動了、而且情況太多了）。首先UEFI用戶在<code>/etc/portage/make.conf</code>文件中加上：</p>
+<pre><code># /etc/portage/make.conf
+
+GRUB_PLATFORMS=&quot;efi-64&quot;</code></pre>
+<p>再安裝GRUB（<strong>注意</strong>一定別漏了這一步！）：</p>
+<div class="sourceCode" id="cb66"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb66-1"><a href="#cb66-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">-a</span> sys-boot/grub</span></code></pre></div>
+<p>隨後根據你先前給磁盤分區時的方案，將引導安裝在該啓動目錄下。對於我的方案是：</p>
+<div class="sourceCode" id="cb67"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a><span class="ex">grub-install</span> <span class="at">--efi-directory</span><span class="op">=</span>/boot/efi</span></code></pre></div>
+<p>最後根據需求編輯<code>/etc/default/grub.cfg</code>，比如你配置了plymouth就要修改其中的：</p>
+<div class="sourceCode" id="cb68"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb68-1"><a href="#cb68-1" aria-hidden="true" tabindex="-1"></a><span class="co"># /etc/default/grub.cfg</span></span>
+<span id="cb68-2"><a href="#cb68-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb68-3"><a href="#cb68-3" aria-hidden="true" tabindex="-1"></a><span class="va">GRUB_CMDLINE_LINUX_DEFAULT</span><span class="op">=</span><span class="st">&#39;quiet splash&#39;</span></span>
+<span id="cb68-4"><a href="#cb68-4" aria-hidden="true" tabindex="-1"></a><span class="va">GRUB_GFXMODE</span><span class="op">=</span>2160x1440x32 <span class="co"># 改爲你自己顯示屏的參數</span></span>
+<span id="cb68-5"><a href="#cb68-5" aria-hidden="true" tabindex="-1"></a><span class="va">GRUB_GFXPAYLOAD_LINUX</span><span class="op">=</span>keep</span></code></pre></div>
+<p>最後生成配置即可：</p>
+<div class="sourceCode" id="cb69"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb69-1"><a href="#cb69-1" aria-hidden="true" tabindex="-1"></a><span class="ex">grub-mkconfig</span> <span class="at">-o</span> /boot/grub/grub.cfg</span></code></pre></div>
+<h3 id="打掃並重啓進入嶄新的系統">打掃並重啓進入嶄新的系統～</h3>
+<p>我們需要收個尾，然後重啓離開livecd環境進入實打實的Gentoo
+Linux後準備配置桌面環境。</p>
+<p>首先退出chroot：</p>
+<div class="sourceCode" id="cb70"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb70-1"><a href="#cb70-1" aria-hidden="true" tabindex="-1"></a><span class="bu">exit</span></span></code></pre></div>
+<p>隨後解除掛載後即可關機：</p>
+<div class="sourceCode" id="cb71"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span></span>
+<span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a><span class="fu">umount</span> <span class="at">-l</span> /mnt/gentoo/dev<span class="dt">{/shm</span><span class="op">,</span><span class="dt">/pts</span><span class="op">,</span><span class="dt">}</span></span>
+<span id="cb71-3"><a href="#cb71-3" aria-hidden="true" tabindex="-1"></a><span class="fu">umount</span> <span class="at">-R</span> /mnt/gentoo</span>
+<span id="cb71-4"><a href="#cb71-4" aria-hidden="true" tabindex="-1"></a><span class="ex">shutdown</span> <span class="at">-h</span> now</span></code></pre></div>
+<p>開機後如果沒出意外就會進入系統。使用root賬戶登錄就準備好安裝桌面環境了。如果啓動不能也不要驚慌，再用livecd啓動後chroot進去看看是哪裏出問題了然後哪裏不對改哪裏就好。</p>
+<h2 id="桌面環境的安裝">桌面環境的安裝</h2>
+<h3 id="選擇">選擇</h3>
+<p>人們的xp豐富多樣，Linux的桌面環境也是牛鬼蛇神。古有X Window
+System、今有Wayland作爲協議。兩者之上又有數不清的被我們成爲桌面環境的東西。桌面環境的構成如下：
+- 窗口管理器，有平鋪式、疊加式和他們的雜交之分，它們控制窗口； -
+狀態欄、程序坞、合成器等，它們讓我們的桌面環境變得很好。</p>
+<p>目前主流的桌面環境有Gnome、KDE和Xfce等，還有窗口管理器如dwm等。Gnome這些是由窗口管理器和一些其他的程式組成的環境，而那些窗口管理器則需要用戶自己挑選那些用來提供狀態欄等功能的程式。</p>
+<p>除此之外，許多人還會選擇一個叫顯示管理器的東西，它可以爲用戶提供圖形化的登錄界面以及符合直覺的切換桌面環境的東西。他們有sddm、gdm、lightdm、slim等。關於它們有一個小故事（來自<a
+href="https://book.bsdcn.org/di-4-zhang-zhuo-mian-an-zhuang/di-4.0-jie-gai-shu">FreeBSD中文社區</a>）：
+&gt; sddm、gdm、lightdm、slim在系統里<del>開銀趴</del>亂戰： &gt;
+sddm：我背後是KDE &gt; gdm：我背後是Gnome &gt;
+lightdm：我背後可以是任何一個 &gt;
+slim：怎麼辦？好慌，潛水太久，管理員要踢我了 &gt;
+系統：合着你們在我地盤上養蠱呢</p>
+<p>總之，要不用他們也是完全可行的。</p>
+<p>至於選取哪個桌面系統，我第一、二次安裝Gentoo時安裝的都是KDE，但我覺得它有些複雜了：有非常靈活的佈局，甚至可以手動拖動配置；然而當我想要程序坞根據正在運行的程序自動調整寬度時，網上推薦的方案都是安裝一個圖標極丑的latte
+dock。而且它的整體風格我不太喜歡，知乎上有人評價說像Windows，雖然我沒怎麼用過Windows（一開始想裝Gentoo就是因爲第一次買Windows電腦然後用不慣Windows）所以不知道，但就是感覺不太對。當然KDE的性能沒得說，資源佔用也非常少。接着我試了試Gnome4，雖然第一眼看上去很好看，交互動作很豐富也很流暢，但是資源佔用稍微高了點，同時想要稍微改一改佈局什麼的話非常反人類，直接就放棄了。所以當時第三次我是安裝了Xfce。
+<img src="./xfce-ini.jpg" title="剛安裝Xfce後截圖"
+alt="Xfce剛安裝之後" /> <img src="./xfce-after.jpg"
+title="配置完Xfce後截圖" alt="Xfce配置後" />
+用着感覺挺舒服的。但之後聽說了XMonad這個用Haskell寫的平鋪式窗口管理器，非常好奇於是又重裝了系統。發現也很好用。Haskell環境我原來就有，雖然我一般都寫OCaml的，Gentoo有slot、不需要擔心衝突。至於性能，還是可以的。至於生態，我覺得還是很豐富的，XMonad-contrib里有各種各樣的包滿足各種各樣的需求。配置也很方便，抄Wiki的時候順便改一改就好了。
+<img src="./xmonad-emacs.jpg" title="Emacs編輯XMonad配置文件"
+alt="XMonad配置文件" /> <img src="./xmonad-qemu.jpg"
+title="用QEMU玩明日方舟（性能堪憂）" alt="QEMU玩小破舟" />
+然後第三次的時候裝wine-proton的時候手殘，處理循環依賴的時候忘了<code>--oneshot</code>，然後dispatch-conf完<code>emerge -avuDN @world</code>報依賴衝突，然後我又是一通亂搞，依賴衝突越來越多。於是又重裝。還是XMonad，配置什麼都有了，安裝了一個非常乾淨的系統。但越用X
+Window
+System越覺得不乾淨。於是又重裝，這次是swayWM，用Vulkan後端。第五次重裝後我終於覺得能一直用下去了。基於Wayland的窗口管理器在字體渲染上整體觀感比XOrg好了太多，在XMonad中我還需要額外設置modesetting驅動的tearfree，而觸控屏、觸控板的手勢等是之前不敢想象的。
+<img src="./sway-mpv.jpg" title="mpv聽歌" alt="mpv聽歌" /> <img
+src="./sway-emacsmd.jpg" title="使用Emacs撰寫本文"
+alt="Emacs編輯Markdown" /> <img src="./sway-emacsia1.jpg"
+title="使用Emacs寫IA（1）" alt="Emacs編輯LaTeX（1）" /> <img
+src="./sway-emacsia2.jpg" title="使用Emacs寫IA（2）"
+alt="Emacs編輯LaTeX（2）" /> <img src="./sway-emacsia3.jpg"
+title="使用Emacs寫IA（3）" alt="Emacs編輯LaTeX（3）" /> <img
+src="./sway-loggerpro.jpg" title="用wine-proton使用LoggerPro"
+alt="使用wine-proton運行Windows應用" /></p>
+<p>用swayWM，我寫完了物理的Internal
+Assignment、完成了TOK的大作業、寫了一個在OCaml里處理JSON用的<a
+href="https://github.com/RadioNoiseE/JSON-ML">庫</a>、<del>還看完了『平穩世代的韋馱天』和『異世界舅舅』</del>，感覺十分滿意。所以下面將分別講使用基於X
+Window System的XMonad和Wayland的swayWM。</p>
+<p>如果你希望安裝其它窗口管理器，在搜索引擎搜索「Gentoo」後加上該窗口管理器的名字然後根據Wiki安裝即可。如果你希望使用桌面環境，重新選擇系統配置文件：</p>
+<div class="sourceCode" id="cb72"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb72-1"><a href="#cb72-1" aria-hidden="true" tabindex="-1"></a><span class="ex">eselect</span> profile list</span>
+<span id="cb72-2"><a href="#cb72-2" aria-hidden="true" tabindex="-1"></a><span class="ex">eselect</span> profile set [num] <span class="co"># 選取上個命令列出的profile中帶有桌面環境名字的，如Gnome OpenRC等</span></span></code></pre></div>
+<p>隨後更新：</p>
+<div class="sourceCode" id="cb73"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">-avuDN</span> @world</span></code></pre></div>
+<p>隨後遵從Gentoo Wiki的安裝指南即可。</p>
+<h3 id="xorg與xmonad">XOrg與XMonad</h3>
+<h4 id="安裝必要軟件">安裝必要軟件</h4>
+<p>創建wm集合：</p>
+<div class="sourceCode" id="cb74"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb74-1"><a href="#cb74-1" aria-hidden="true" tabindex="-1"></a><span class="fu">touch</span> /etc/portage/sets/wm</span>
+<span id="cb74-2"><a href="#cb74-2" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;x11-base/xorg-server&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/wm <span class="co"># XOrg服務器，這時可以不裝，在安裝XMonad時被作爲依賴安裝</span></span>
+<span id="cb74-3"><a href="#cb74-3" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;x11-wm/xmonad&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/wm <span class="co"># 窗口管理器</span></span>
+<span id="cb74-4"><a href="#cb74-4" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;x11-wm/xmonad-contrib&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/wm <span class="co"># 對窗口管理器的（社區）擴展</span></span>
+<span id="cb74-5"><a href="#cb74-5" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;x11-misc/xmobar&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/wm <span class="co"># 跟Xmonad配套的同樣使用Haskell作成的狀態欄，可選的還有dzen</span></span>
+<span id="cb74-6"><a href="#cb74-6" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;x11-misc/picom&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/wm <span class="co"># 合成器，如果你不需要窗口透明等特效可以不裝</span></span>
+<span id="cb74-7"><a href="#cb74-7" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;media-gfx/feh&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/wm <span class="co"># 用來設定背景圖片的，大概率是必裝的</span></span>
+<span id="cb74-8"><a href="#cb74-8" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;x11-misc/slock&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/wm <span class="co"># sucklss出品的很精緻的鎖屏工具</span></span>
+<span id="cb74-9"><a href="#cb74-9" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;media-gfx/scrot&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/wm <span class="co"># X11下的截圖工具</span></span>
+<span id="cb74-10"><a href="#cb74-10" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;x11-misc/rofi&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/wm <span class="co"># 應用程式啓動器，不用dmenu是因爲它會遮住狀態欄，這不好</span></span>
+<span id="cb74-11"><a href="#cb74-11" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;x11-terms/alacritty&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/wm <span class="co"># 被譽爲最快的終端模擬器，美中不足在於是用Rust寫的（編譯Rust對Gentoo用戶不友好）</span></span></code></pre></div>
+<p>隨後一鍵安裝：</p>
+<div class="sourceCode" id="cb75"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb75-1"><a href="#cb75-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">--ask</span> @wm</span></code></pre></div>
+<p>然後就沒有然後了，可以開始配置了。</p>
+<h4 id="配置">配置</h4>
+<p>因爲XMonad的特殊性，我們需要先創建一個普通用戶（使用XMonad窗口管理器的）：</p>
+<div class="sourceCode" id="cb76"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb76-1"><a href="#cb76-1" aria-hidden="true" tabindex="-1"></a><span class="ex">useradd</span> <span class="at">-m</span> <span class="at">-G</span> users,wheel,audio,cdrom,cron,portage,usb,video <span class="at">-s</span> /bin/bash larry <span class="co"># 創建Larry奶牛用戶</span></span>
+<span id="cb76-2"><a href="#cb76-2" aria-hidden="true" tabindex="-1"></a><span class="fu">passwd</span> larry <span class="co"># 設置用戶密碼</span></span></code></pre></div>
+<p>隨後使用<code>exit</code>退出root賬戶後用新創建的用戶賬戶登錄後就可以正式開始配置了</p>
+<p>首先我們要寫<code>.xinitrc</code>腳本，當我們使用startx的時候調用的就是這個腳本來啓動XMonad的：</p>
+<div class="sourceCode" id="cb77"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb77-1"><a href="#cb77-1" aria-hidden="true" tabindex="-1"></a><span class="fu">touch</span> ~/.xinitrc</span>
+<span id="cb77-2"><a href="#cb77-2" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;exec dbus-launch --sh-syntax --exit-with-session xmonad&quot;</span> <span class="op">&gt;&gt;</span> ~/.xinitrc</span></code></pre></div>
+<p>即可。</p>
+<p>如果你需要在登錄到該用戶後自動開啓XMonad，則在<code>.bash_profile</code>中添加：</p>
+<div class="sourceCode" id="cb78"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb78-1"><a href="#cb78-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="bu">shopt</span> <span class="at">-q</span> login_shell<span class="kw">;</span> <span class="cf">then</span></span>
+<span id="cb78-2"><a href="#cb78-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">[[</span> <span class="ot">-f</span> ~/.bashrc <span class="kw">]]</span> <span class="kw">&amp;&amp;</span> <span class="bu">source</span> ~/.bashrc</span>
+<span id="cb78-3"><a href="#cb78-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">[[</span> <span class="ot">-t</span> 0 <span class="kw">&amp;&amp;</span> <span class="va">$(</span><span class="fu">tty</span><span class="va">)</span> <span class="ot">==</span> /dev/tty1 <span class="kw">&amp;&amp;</span> <span class="ot">!</span> <span class="va">$DISPLAY</span> <span class="kw">]]</span> <span class="kw">&amp;&amp;</span> <span class="bu">exec</span> startx</span>
+<span id="cb78-4"><a href="#cb78-4" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span></span>
+<span id="cb78-5"><a href="#cb78-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">exit</span> 1</span>
+<span id="cb78-6"><a href="#cb78-6" aria-hidden="true" tabindex="-1"></a><span class="cf">fi</span></span></code></pre></div>
+<p>即可。如果你有需要在進入桌面環境時啓動的程式（如fcitx），可以選擇在這裏添加，但更建議使用XMonad的<code>XMonad.Util.SpawnOnce</code>進行配置。</p>
+<p>隨後我們先配置XMonad和XMobar，請參考<a
+href="https://xmonad.org/TUTORIAL.html">官方教程</a>，應該不需要Haskell基礎。對於上述安裝的輔助軟件，這裏有一個適配的基礎配置：</p>
+<div class="sourceCode" id="cb79"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb79-1"><a href="#cb79-1" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">XMonad</span></span>
+<span id="cb79-2"><a href="#cb79-2" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">XMonad.Util.EZConfig</span></span>
+<span id="cb79-3"><a href="#cb79-3" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">XMonad.Util.Ungrab</span></span>
+<span id="cb79-4"><a href="#cb79-4" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">XMonad.Util.Loggers</span></span>
+<span id="cb79-5"><a href="#cb79-5" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">XMonad.Util.SpawnOnce</span></span>
+<span id="cb79-6"><a href="#cb79-6" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">XMonad.Hooks.EwmhDesktops</span></span>
+<span id="cb79-7"><a href="#cb79-7" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">XMonad.Hooks.DynamicLog</span></span>
+<span id="cb79-8"><a href="#cb79-8" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">XMonad.Hooks.ManageHelpers</span></span>
+<span id="cb79-9"><a href="#cb79-9" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">XMonad.Hooks.StatusBar</span></span>
+<span id="cb79-10"><a href="#cb79-10" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">XMonad.Hooks.StatusBar.PP</span></span>
+<span id="cb79-11"><a href="#cb79-11" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">XMonad.Layout.ThreeColumns</span></span>
+<span id="cb79-12"><a href="#cb79-12" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">XMonad.Layout.Magnifier</span></span>
+<span id="cb79-13"><a href="#cb79-13" aria-hidden="true" tabindex="-1"></a><span class="kw">import</span> <span class="dt">XMonad.Layout.Spacing</span></span>
+<span id="cb79-14"><a href="#cb79-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb79-15"><a href="#cb79-15" aria-hidden="true" tabindex="-1"></a><span class="ot">main ::</span> <span class="dt">IO</span> ()</span>
+<span id="cb79-16"><a href="#cb79-16" aria-hidden="true" tabindex="-1"></a>main <span class="ot">=</span> xmonad</span>
+<span id="cb79-17"><a href="#cb79-17" aria-hidden="true" tabindex="-1"></a>     <span class="op">.</span> ewmhFullscreen</span>
+<span id="cb79-18"><a href="#cb79-18" aria-hidden="true" tabindex="-1"></a>     <span class="op">.</span> ewmh</span>
+<span id="cb79-19"><a href="#cb79-19" aria-hidden="true" tabindex="-1"></a>     <span class="op">.</span> withEasySB (statusBarProp <span class="st">&quot;xmobar&quot;</span> (<span class="fu">pure</span> myXmobarPP)) defToggleStrutsKey</span>
+<span id="cb79-20"><a href="#cb79-20" aria-hidden="true" tabindex="-1"></a>     <span class="op">$</span> conf</span>
+<span id="cb79-21"><a href="#cb79-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb79-22"><a href="#cb79-22" aria-hidden="true" tabindex="-1"></a>conf <span class="ot">=</span> def</span>
+<span id="cb79-23"><a href="#cb79-23" aria-hidden="true" tabindex="-1"></a>     { terminal    <span class="ot">=</span> <span class="st">&quot;alacritty&quot;</span>                   <span class="co">-- Set the default terminal emulator</span></span>
+<span id="cb79-24"><a href="#cb79-24" aria-hidden="true" tabindex="-1"></a>     , modMask     <span class="ot">=</span> mod4Mask                      <span class="co">-- Rebind Mod to the &lt;meta&gt; key</span></span>
+<span id="cb79-25"><a href="#cb79-25" aria-hidden="true" tabindex="-1"></a>     , startupHook <span class="ot">=</span> xinit                         <span class="co">-- Things to be started with XMonad</span></span>
+<span id="cb79-26"><a href="#cb79-26" aria-hidden="true" tabindex="-1"></a>     , layoutHook  <span class="ot">=</span> spacingWithEdge <span class="dv">6</span> <span class="op">$</span> myLayout  <span class="co">-- Use custom layouts</span></span>
+<span id="cb79-27"><a href="#cb79-27" aria-hidden="true" tabindex="-1"></a>     , manageHook  <span class="ot">=</span> myManageHook                  <span class="co">-- Match on certain windows</span></span>
+<span id="cb79-28"><a href="#cb79-28" aria-hidden="true" tabindex="-1"></a>     }</span>
+<span id="cb79-29"><a href="#cb79-29" aria-hidden="true" tabindex="-1"></a>  <span class="ot">`additionalKeysP`</span></span>
+<span id="cb79-30"><a href="#cb79-30" aria-hidden="true" tabindex="-1"></a>     [ (<span class="st">&quot;M-S-z&quot;</span>,           spawn <span class="st">&quot;slock&quot;</span>)                                                          <span class="co">-- Lock the screen</span></span>
+<span id="cb79-31"><a href="#cb79-31" aria-hidden="true" tabindex="-1"></a>     , (<span class="st">&quot;M-C-s&quot;</span>, unGrab <span class="op">*&gt;</span> spawn <span class="st">&quot;scrot -s --quality 100 -e \&#39;mv $f ~/Images/\&#39;&quot;</span>)                  <span class="co">-- Screenshot functionality</span></span>
+<span id="cb79-32"><a href="#cb79-32" aria-hidden="true" tabindex="-1"></a>     , (<span class="st">&quot;M-S-l&quot;</span>,           spawn <span class="st">&quot;rofi -config ~/.rofirc -show drun&quot;</span>)                              <span class="co">-- Spotlight</span></span>
+<span id="cb79-33"><a href="#cb79-33" aria-hidden="true" tabindex="-1"></a>     , (<span class="st">&quot;&lt;XF86AudioLowerVolume&gt;&quot;</span> , unGrab <span class="op">*&gt;</span> spawn <span class="st">&quot;pactl set-sink-volume @DEFAULT_SINK@ -1000&quot;</span>)   <span class="co">-- Decrease volume</span></span>
+<span id="cb79-34"><a href="#cb79-34" aria-hidden="true" tabindex="-1"></a>     , (<span class="st">&quot;&lt;XF86AudioRaiseVolume&gt;&quot;</span> , unGrab <span class="op">*&gt;</span> spawn <span class="st">&quot;pactl set-sink-volume @DEFAULT_SINK@ +1000&quot;</span>)   <span class="co">-- Increase volume</span></span>
+<span id="cb79-35"><a href="#cb79-35" aria-hidden="true" tabindex="-1"></a>     , (<span class="st">&quot;&lt;XF86AudioMute&gt;&quot;</span>        , unGrab <span class="op">*&gt;</span> spawn <span class="st">&quot;pactl set-sink-volume @DEFAULT_SINK@ toggle&quot;</span>)  <span class="co">-- Toggle (un)mute volume</span></span>
+<span id="cb79-36"><a href="#cb79-36" aria-hidden="true" tabindex="-1"></a>     , (<span class="st">&quot;&lt;XF86MonBrightnessDown&gt;&quot;</span>, unGrab <span class="op">*&gt;</span> spawn <span class="st">&quot;xbacklight -6&quot;</span>)                                <span class="co">-- Decrease monitor backlight</span></span>
+<span id="cb79-37"><a href="#cb79-37" aria-hidden="true" tabindex="-1"></a>     , (<span class="st">&quot;&lt;XF86MonBrightnessUp&gt;&quot;</span>  , unGrab <span class="op">*&gt;</span> spawn <span class="st">&quot;xbacklight +6&quot;</span>)                                <span class="co">-- Increase monitor backlight</span></span>
+<span id="cb79-38"><a href="#cb79-38" aria-hidden="true" tabindex="-1"></a>     ]</span>
+<span id="cb79-39"><a href="#cb79-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb79-40"><a href="#cb79-40" aria-hidden="true" tabindex="-1"></a><span class="ot">xinit ::</span> <span class="dt">X</span> ()</span>
+<span id="cb79-41"><a href="#cb79-41" aria-hidden="true" tabindex="-1"></a>xinit <span class="ot">=</span> <span class="kw">do</span></span>
+<span id="cb79-42"><a href="#cb79-42" aria-hidden="true" tabindex="-1"></a>      spawnOnce <span class="st">&quot;feh --bg-fill --no-fehbg ~/.background&quot;</span>  <span class="co">-- Set background</span></span>
+<span id="cb79-43"><a href="#cb79-43" aria-hidden="true" tabindex="-1"></a>      spawnOnce <span class="st">&quot;picom --config ~/.picomrc -b&quot;</span>            <span class="co">-- Windows compositor</span></span>
+<span id="cb79-44"><a href="#cb79-44" aria-hidden="true" tabindex="-1"></a>      spawnOnce <span class="st">&quot;fcitx&quot;</span>                                   <span class="co">-- Input method initialize</span></span>
+<span id="cb79-45"><a href="#cb79-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb79-46"><a href="#cb79-46" aria-hidden="true" tabindex="-1"></a>myLayout <span class="ot">=</span> tiled <span class="op">|||</span> <span class="dt">Mirror</span> tiled <span class="op">|||</span> <span class="dt">Full</span> <span class="op">|||</span> threeCol</span>
+<span id="cb79-47"><a href="#cb79-47" aria-hidden="true" tabindex="-1"></a>       <span class="kw">where</span></span>
+<span id="cb79-48"><a href="#cb79-48" aria-hidden="true" tabindex="-1"></a>         threeCol <span class="ot">=</span> magnifiercz&#39; <span class="fl">1.3</span> <span class="op">$</span> <span class="dt">ThreeColMid</span> nmaster delta ratio</span>
+<span id="cb79-49"><a href="#cb79-49" aria-hidden="true" tabindex="-1"></a>         tiled    <span class="ot">=</span> <span class="dt">Tall</span> nmaster delta ratio</span>
+<span id="cb79-50"><a href="#cb79-50" aria-hidden="true" tabindex="-1"></a>         nmaster  <span class="ot">=</span> <span class="dv">1</span>      <span class="co">-- Default number of windows in the master pane</span></span>
+<span id="cb79-51"><a href="#cb79-51" aria-hidden="true" tabindex="-1"></a>         ratio    <span class="ot">=</span> <span class="dv">1</span><span class="op">/</span><span class="dv">2</span>    <span class="co">-- Default proportion of the screen occupied by master pane</span></span>
+<span id="cb79-52"><a href="#cb79-52" aria-hidden="true" tabindex="-1"></a>         delta    <span class="ot">=</span> <span class="dv">2</span><span class="op">/</span><span class="dv">100</span>  <span class="co">-- Percent of screen to increment by when resizing panes</span></span>
+<span id="cb79-53"><a href="#cb79-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb79-54"><a href="#cb79-54" aria-hidden="true" tabindex="-1"></a><span class="ot">myXmobarPP ::</span> <span class="dt">PP</span></span>
+<span id="cb79-55"><a href="#cb79-55" aria-hidden="true" tabindex="-1"></a>myXmobarPP <span class="ot">=</span> def</span>
+<span id="cb79-56"><a href="#cb79-56" aria-hidden="true" tabindex="-1"></a>           { ppSep             <span class="ot">=</span> blue <span class="st">&quot; • &quot;</span></span>
+<span id="cb79-57"><a href="#cb79-57" aria-hidden="true" tabindex="-1"></a>           , ppTitleSanitize   <span class="ot">=</span> xmobarStrip</span>
+<span id="cb79-58"><a href="#cb79-58" aria-hidden="true" tabindex="-1"></a>           , ppCurrent         <span class="ot">=</span> wrap <span class="st">&quot; &quot;</span> <span class="st">&quot;&quot;</span> <span class="op">.</span> xmobarBorder <span class="st">&quot;Top&quot;</span> <span class="st">&quot;#8a9a7b&quot;</span> <span class="dv">2</span></span>
+<span id="cb79-59"><a href="#cb79-59" aria-hidden="true" tabindex="-1"></a>           , ppHidden          <span class="ot">=</span> white <span class="op">.</span> wrap <span class="st">&quot; &quot;</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb79-60"><a href="#cb79-60" aria-hidden="true" tabindex="-1"></a>           , ppHiddenNoWindows <span class="ot">=</span> lowWhite <span class="op">.</span> wrap <span class="st">&quot; &quot;</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb79-61"><a href="#cb79-61" aria-hidden="true" tabindex="-1"></a>           , ppUrgent          <span class="ot">=</span> red <span class="op">.</span> wrap (yellow <span class="st">&quot;!&quot;</span>) (yellow <span class="st">&quot;!&quot;</span>)</span>
+<span id="cb79-62"><a href="#cb79-62" aria-hidden="true" tabindex="-1"></a>           , ppOrder           <span class="ot">=</span> \[ws, l, _, wins] <span class="ot">-&gt;</span> [ws, l, wins]</span>
+<span id="cb79-63"><a href="#cb79-63" aria-hidden="true" tabindex="-1"></a>           , ppExtras          <span class="ot">=</span> [logTitles formatFocused formatUnfocused]</span>
+<span id="cb79-64"><a href="#cb79-64" aria-hidden="true" tabindex="-1"></a>           }</span>
+<span id="cb79-65"><a href="#cb79-65" aria-hidden="true" tabindex="-1"></a>         <span class="kw">where</span></span>
+<span id="cb79-66"><a href="#cb79-66" aria-hidden="true" tabindex="-1"></a>           formatFocused   <span class="ot">=</span> wrap (white    <span class="st">&quot;[&quot;</span>) (white    <span class="st">&quot;]&quot;</span>) <span class="op">.</span> red  <span class="op">.</span> ppWindow</span>
+<span id="cb79-67"><a href="#cb79-67" aria-hidden="true" tabindex="-1"></a>           formatUnfocused <span class="ot">=</span> wrap (lowWhite <span class="st">&quot;[&quot;</span>) (lowWhite <span class="st">&quot;]&quot;</span>) <span class="op">.</span> cyan <span class="op">.</span> ppWindow</span>
+<span id="cb79-68"><a href="#cb79-68" aria-hidden="true" tabindex="-1"></a><span class="ot">           ppWindow ::</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">String</span></span>
+<span id="cb79-69"><a href="#cb79-69" aria-hidden="true" tabindex="-1"></a>           ppWindow <span class="ot">=</span> xmobarRaw <span class="op">.</span> (\w <span class="ot">-&gt;</span> <span class="kw">if</span> <span class="fu">null</span> w <span class="kw">then</span> <span class="st">&quot;untitled&quot;</span> <span class="kw">else</span> w) <span class="op">.</span> shorten <span class="dv">20</span></span>
+<span id="cb79-70"><a href="#cb79-70" aria-hidden="true" tabindex="-1"></a>           blue, lowWhite, magenta, red, white, yellow, green,<span class="ot"> cyan ::</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">String</span></span>
+<span id="cb79-71"><a href="#cb79-71" aria-hidden="true" tabindex="-1"></a>           magenta  <span class="ot">=</span> xmobarColor <span class="st">&quot;#a292a3&quot;</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb79-72"><a href="#cb79-72" aria-hidden="true" tabindex="-1"></a>           blue     <span class="ot">=</span> xmobarColor <span class="st">&quot;#8ba4b0&quot;</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb79-73"><a href="#cb79-73" aria-hidden="true" tabindex="-1"></a>           white    <span class="ot">=</span> xmobarColor <span class="st">&quot;#C8C093&quot;</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb79-74"><a href="#cb79-74" aria-hidden="true" tabindex="-1"></a>           yellow   <span class="ot">=</span> xmobarColor <span class="st">&quot;#c4b28a&quot;</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb79-75"><a href="#cb79-75" aria-hidden="true" tabindex="-1"></a>           red      <span class="ot">=</span> xmobarColor <span class="st">&quot;#c4746e&quot;</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb79-76"><a href="#cb79-76" aria-hidden="true" tabindex="-1"></a>           lowWhite <span class="ot">=</span> xmobarColor <span class="st">&quot;#bbbbbb&quot;</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb79-77"><a href="#cb79-77" aria-hidden="true" tabindex="-1"></a>           green    <span class="ot">=</span> xmobarColor <span class="st">&quot;#8a9a7b&quot;</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb79-78"><a href="#cb79-78" aria-hidden="true" tabindex="-1"></a>           cyan     <span class="ot">=</span> xmobarColor <span class="st">&quot;#8ea4a2&quot;</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb79-79"><a href="#cb79-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb79-80"><a href="#cb79-80" aria-hidden="true" tabindex="-1"></a><span class="ot">myManageHook ::</span> <span class="dt">ManageHook</span></span>
+<span id="cb79-81"><a href="#cb79-81" aria-hidden="true" tabindex="-1"></a>myManageHook <span class="ot">=</span> composeAll</span>
+<span id="cb79-82"><a href="#cb79-82" aria-hidden="true" tabindex="-1"></a>             [ isDialog                 <span class="op">--&gt;</span> doFloat</span>
+<span id="cb79-83"><a href="#cb79-83" aria-hidden="true" tabindex="-1"></a>             , className <span class="op">=?</span> <span class="st">&quot;mpv&quot;</span>       <span class="op">--&gt;</span> doFloat</span>
+<span id="cb79-84"><a href="#cb79-84" aria-hidden="true" tabindex="-1"></a>             , className <span class="op">=?</span> <span class="st">&quot;fontforge&quot;</span> <span class="op">--&gt;</span> doFloat</span>
+<span id="cb79-85"><a href="#cb79-85" aria-hidden="true" tabindex="-1"></a>             ]</span></code></pre></div>
+<p>以及對應的XMobar配置：</p>
+<div class="sourceCode" id="cb80"><pre
+class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb80-1"><a href="#cb80-1" aria-hidden="true" tabindex="-1"></a><span class="dt">Config</span> { overrideRedirect <span class="ot">=</span> <span class="dt">False</span></span>
+<span id="cb80-2"><a href="#cb80-2" aria-hidden="true" tabindex="-1"></a>       , font     <span class="ot">=</span> <span class="st">&quot;xft:IBM3270-13.2:antialias=ture,notoSansMonoCJKjp-11.6&quot;</span></span>
+<span id="cb80-3"><a href="#cb80-3" aria-hidden="true" tabindex="-1"></a>       , additionalFonts <span class="ot">=</span> [ <span class="st">&quot;xft:notoSansMonoCJKjp-10&quot;</span> ]</span>
+<span id="cb80-4"><a href="#cb80-4" aria-hidden="true" tabindex="-1"></a>       , bgColor  <span class="ot">=</span> <span class="st">&quot;#5f5f5f&quot;</span></span>
+<span id="cb80-5"><a href="#cb80-5" aria-hidden="true" tabindex="-1"></a>       , fgColor  <span class="ot">=</span> <span class="st">&quot;#f8f8f2&quot;</span></span>
+<span id="cb80-6"><a href="#cb80-6" aria-hidden="true" tabindex="-1"></a>       , position <span class="ot">=</span> <span class="dt">TopW</span> <span class="dt">L</span> <span class="dv">100</span></span>
+<span id="cb80-7"><a href="#cb80-7" aria-hidden="true" tabindex="-1"></a>       , persistent  <span class="ot">=</span> <span class="dt">False</span></span>
+<span id="cb80-8"><a href="#cb80-8" aria-hidden="true" tabindex="-1"></a>       , hideOnStart <span class="ot">=</span> <span class="dt">False</span></span>
+<span id="cb80-9"><a href="#cb80-9" aria-hidden="true" tabindex="-1"></a>       , commands <span class="ot">=</span> [ <span class="dt">Run</span> <span class="dt">MultiCpu</span></span>
+<span id="cb80-10"><a href="#cb80-10" aria-hidden="true" tabindex="-1"></a>                        [ <span class="st">&quot;--template&quot;</span> , <span class="st">&quot;Cpu: &lt;total0&gt;:&lt;total1&gt;%&quot;</span></span>
+<span id="cb80-11"><a href="#cb80-11" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;--Low&quot;</span>      , <span class="st">&quot;50&quot;</span></span>
+<span id="cb80-12"><a href="#cb80-12" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;--High&quot;</span>     , <span class="st">&quot;85&quot;</span></span>
+<span id="cb80-13"><a href="#cb80-13" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;--low&quot;</span>      , <span class="st">&quot;white&quot;</span></span>
+<span id="cb80-14"><a href="#cb80-14" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;--normal&quot;</span>   , <span class="st">&quot;white&quot;</span></span>
+<span id="cb80-15"><a href="#cb80-15" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;--high&quot;</span>     , <span class="st">&quot;white&quot;</span></span>
+<span id="cb80-16"><a href="#cb80-16" aria-hidden="true" tabindex="-1"></a>                        ] <span class="dv">10</span></span>
+<span id="cb80-17"><a href="#cb80-17" aria-hidden="true" tabindex="-1"></a>                    , <span class="dt">Run</span> <span class="dt">Alsa</span> <span class="st">&quot;default&quot;</span> <span class="st">&quot;Master&quot;</span></span>
+<span id="cb80-18"><a href="#cb80-18" aria-hidden="true" tabindex="-1"></a>                        [ <span class="st">&quot;--template&quot;</span>, <span class="st">&quot;&lt;volumestatus&gt;&quot;</span></span>
+<span id="cb80-19"><a href="#cb80-19" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;--suffix&quot;</span>  , <span class="st">&quot;True&quot;</span></span>
+<span id="cb80-20"><a href="#cb80-20" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;--&quot;</span></span>
+<span id="cb80-21"><a href="#cb80-21" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;--on&quot;</span>, <span class="st">&quot;&quot;</span></span>
+<span id="cb80-22"><a href="#cb80-22" aria-hidden="true" tabindex="-1"></a>                        ]</span>
+<span id="cb80-23"><a href="#cb80-23" aria-hidden="true" tabindex="-1"></a>                    , <span class="dt">Run</span> <span class="dt">Battery</span></span>
+<span id="cb80-24"><a href="#cb80-24" aria-hidden="true" tabindex="-1"></a>                        [ <span class="st">&quot;--template&quot;</span> , <span class="st">&quot;Batt: &lt;acstatus&gt;&quot;</span></span>
+<span id="cb80-25"><a href="#cb80-25" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;--Low&quot;</span>      , <span class="st">&quot;10&quot;</span></span>
+<span id="cb80-26"><a href="#cb80-26" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;--High&quot;</span>     , <span class="st">&quot;80&quot;</span></span>
+<span id="cb80-27"><a href="#cb80-27" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;--low&quot;</span>      , <span class="st">&quot;white&quot;</span></span>
+<span id="cb80-28"><a href="#cb80-28" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;--normal&quot;</span>   , <span class="st">&quot;white&quot;</span></span>
+<span id="cb80-29"><a href="#cb80-29" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;--high&quot;</span>     , <span class="st">&quot;white&quot;</span></span>
+<span id="cb80-30"><a href="#cb80-30" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;--&quot;</span></span>
+<span id="cb80-31"><a href="#cb80-31" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;-o&quot;</span>  , <span class="st">&quot;&lt;left&gt;% (&lt;timeleft&gt;)&quot;</span></span>
+<span id="cb80-32"><a href="#cb80-32" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;-O&quot;</span>  , <span class="st">&quot;&lt;fc=#a292a3&gt;Charging&lt;/fc&gt;&quot;</span></span>
+<span id="cb80-33"><a href="#cb80-33" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;-i&quot;</span>  , <span class="st">&quot;&lt;fc=#8ea4a2&gt;Charged&lt;/fc&gt;&quot;</span></span>
+<span id="cb80-34"><a href="#cb80-34" aria-hidden="true" tabindex="-1"></a>                        ] <span class="dv">50</span></span>
+<span id="cb80-35"><a href="#cb80-35" aria-hidden="true" tabindex="-1"></a>                    , <span class="dt">Run</span> <span class="dt">DynNetwork</span></span>
+<span id="cb80-36"><a href="#cb80-36" aria-hidden="true" tabindex="-1"></a>                        [ <span class="st">&quot;--template&quot;</span> , <span class="st">&quot;&lt;dev&gt;: &lt;tx&gt;:&lt;rx&gt;kB/s&quot;</span></span>
+<span id="cb80-37"><a href="#cb80-37" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;--Low&quot;</span>      , <span class="st">&quot;1000&quot;</span></span>
+<span id="cb80-38"><a href="#cb80-38" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;--High&quot;</span>     , <span class="st">&quot;5000&quot;</span></span>
+<span id="cb80-39"><a href="#cb80-39" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;--low&quot;</span>      , <span class="st">&quot;white&quot;</span></span>
+<span id="cb80-40"><a href="#cb80-40" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;--normal&quot;</span>   , <span class="st">&quot;white&quot;</span></span>
+<span id="cb80-41"><a href="#cb80-41" aria-hidden="true" tabindex="-1"></a>                        , <span class="st">&quot;--high&quot;</span>     , <span class="st">&quot;white&quot;</span></span>
+<span id="cb80-42"><a href="#cb80-42" aria-hidden="true" tabindex="-1"></a>                        ] <span class="dv">10</span></span>
+<span id="cb80-43"><a href="#cb80-43" aria-hidden="true" tabindex="-1"></a>                    , <span class="dt">Run</span> <span class="dt">Memory</span> [<span class="st">&quot;--template&quot;</span>, <span class="st">&quot;Mem: &lt;usedratio&gt;%&quot;</span>] <span class="dv">10</span></span>
+<span id="cb80-44"><a href="#cb80-44" aria-hidden="true" tabindex="-1"></a>                    , <span class="dt">Run</span> <span class="dt">Swap</span> [] <span class="dv">10</span></span>
+<span id="cb80-45"><a href="#cb80-45" aria-hidden="true" tabindex="-1"></a>                    , <span class="dt">Run</span> <span class="dt">Date</span> <span class="st">&quot;%a %Y-%m-%d %H:%M&quot;</span> <span class="st">&quot;date&quot;</span> <span class="dv">10</span></span>
+<span id="cb80-46"><a href="#cb80-46" aria-hidden="true" tabindex="-1"></a>                    , <span class="dt">Run</span> <span class="dt">XMonadLog</span></span>
+<span id="cb80-47"><a href="#cb80-47" aria-hidden="true" tabindex="-1"></a>                    ]</span>
+<span id="cb80-48"><a href="#cb80-48" aria-hidden="true" tabindex="-1"></a>       , sepChar  <span class="ot">=</span> <span class="st">&quot;%&quot;</span></span>
+<span id="cb80-49"><a href="#cb80-49" aria-hidden="true" tabindex="-1"></a>       , alignSep <span class="ot">=</span> <span class="st">&quot;}{&quot;</span></span>
+<span id="cb80-50"><a href="#cb80-50" aria-hidden="true" tabindex="-1"></a>       , template <span class="ot">=</span> <span class="st">&quot;%XMonadLog% }{ %alsa:default:Master% &lt;fc=#8ba4b0&gt;•&lt;/fc&gt; %battery% &lt;fc=#8ba4b0&gt;•&lt;/fc&gt; %multicpu% &lt;fc=#8ba4b0&gt;•&lt;/fc&gt; %memory% &lt;fc=#8ba4b0&gt;•&lt;/fc&gt; %date% &quot;</span></span>
+<span id="cb80-51"><a href="#cb80-51" aria-hidden="true" tabindex="-1"></a>       }</span></code></pre></div>
+<p>對於快捷鍵綁定，調整聲音和屏幕亮度處需要你使用<code>pulseaudio</code>和<code>acpilight</code>，安裝／配置請自行搜索Gentoo
+Wiki。同時爲了使狀態欄的配置正生效，你需要安裝IBM的3270字體和Noto
+CJK字體。將他們分別放在<code>~/.xmonad/xmonad.hs</code>和<code>~/.xmobar</code>文件中，隨後執行：</p>
+<div class="sourceCode" id="cb81"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb81-1"><a href="#cb81-1" aria-hidden="true" tabindex="-1"></a><span class="ex">xmobar</span> <span class="at">--recompile</span></span></code></pre></div>
+<p>若無報錯則可以使用。</p>
+<p>接下來就是一些雜項的配置，如合成器picom：</p>
+<pre class="conf"><code>vsync=true
+experimental-backend=true
+shadow=false
+shadow-radius=7
+shadow-opacity=.76
+shadow-offset=-7
+shadow-blue=.1
+inactive-opacity=0.79
+frame-opacity=0.76
+inactive-opacity-overwrite=false
+active-opacity=0.87
+wintypes:
+{
+  tooltip = { fade = true; shadow = false; opacity = 0.75; focus = true; full-shadow = false; };
+  dock = { shadow = false; clip-shadow-above = true; opacity = 1 }
+  dnd = { shadow = false; }
+  popup_menu = { opacity = 0.77; shadow = false; }
+  dropdown_menu = { opacity = 0.77; shadow = false; }
+};
+opacity-rule = [
+  &quot;100:class_g = &#39;mpv&#39; &amp;&amp; focused&quot;,
+  &quot;100:class_g = &#39;Virt-manager&#39; &amp;&amp; focused&quot;,
+  &quot;100:class_g = &#39;fontforge&#39; &amp;&amp; focused&quot;
+]</code></pre>
+<p>將你希望配置的東西配置完就可以重啓進入XMonad桌面環境了。隨着使用慢慢打磨自己的配置就好。</p>
+<h4 id="常見事故">常見事故</h4>
+<p>如果你在使用時發現有屏幕撕裂等的現象，請先閱讀<a
+href="https://wiki.gentoo.org/wiki/Xorg/Guide">這篇</a>關於XOrg的文章，隨後以「Screen
+Tearing」「XOrg」以及你的顯卡配置在搜索引擎上搜索方案，常見的包括開啓VSync、Intel顯卡使用modesetting驅動替代xf86驅動等。</p>
+<h3 id="wayland與swaywm">Wayland與SwayWM</h3>
+<h4 id="安裝必要軟件-1">安裝必要軟件</h4>
+<p>首先創建winmgr集合：</p>
+<div class="sourceCode" id="cb83"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb83-1"><a href="#cb83-1" aria-hidden="true" tabindex="-1"></a><span class="fu">touch</span> /etc/portage/sets/winmgr <span class="co"># 創建集合</span></span>
+<span id="cb83-2"><a href="#cb83-2" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;media-libs/vulkan-loader&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/winmgr <span class="co"># 如果你使用默認的gles2後端則不需要（如果你不知道這是什麼那就不要加）</span></span>
+<span id="cb83-3"><a href="#cb83-3" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;dev-libs/wayland&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/winmgr <span class="co"># Wayland協議</span></span>
+<span id="cb83-4"><a href="#cb83-4" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;x11-base/xwayland&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/winmgr <span class="co"># 支持在Wayland下運行X11應用</span></span>
+<span id="cb83-5"><a href="#cb83-5" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;gui-wm/sway&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/winmgr <span class="co"># 窗口管理器</span></span>
+<span id="cb83-6"><a href="#cb83-6" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;gui-apps/waybar&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/winmgr <span class="co"># 狀態欄</span></span>
+<span id="cb83-7"><a href="#cb83-7" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;gui-apps/swaybg&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/winmgr <span class="co"># 背景圖片</span></span>
+<span id="cb83-8"><a href="#cb83-8" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;gui-apps/swayidle&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/winmgr <span class="co"># 定時任務，如一段時間未操作後休眠等</span></span>
+<span id="cb83-9"><a href="#cb83-9" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;gui-apps/swaylock&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/winmgr <span class="co"># 鎖屏用</span></span>
+<span id="cb83-10"><a href="#cb83-10" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;gui-apps/mako&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/winmgr <span class="co"># 通知彈窗</span></span>
+<span id="cb83-11"><a href="#cb83-11" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;gui-apps/grim&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/winmgr <span class="co"># 截屏用</span></span>
+<span id="cb83-12"><a href="#cb83-12" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;gui-apps/foot&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/winmgr <span class="co"># 輕量級的Wayland原生終端模擬器</span></span>
+<span id="cb83-13"><a href="#cb83-13" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;gui-apps/wl-clipboard&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/winmgr <span class="co"># 剪切板</span></span>
+<span id="cb83-14"><a href="#cb83-14" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;dev-libs/bemenu&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/sets/winmgr <span class="co"># dmenu來到Wayland</span></span></code></pre></div>
+<p>然後先<code>emerge --pretend --ask @winmgr</code>看一下USE旗標有沒有需要改動的，最後安裝集合就好。</p>
+<h4 id="配置-1">配置</h4>
+<p>swayWM是i3的移植，而且網上有很多資料。它的配置文件最好放在<code>~/.config/sway/config</code>，有一些需要注意的是：</p>
+<div class="sourceCode" id="cb84"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb84-1"><a href="#cb84-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ~/.config/sway/config</span></span>
+<span id="cb84-2"><a href="#cb84-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb84-3"><a href="#cb84-3" aria-hidden="true" tabindex="-1"></a><span class="bu">set</span> <span class="va">$term</span> foot <span class="co"># 你挑選的終端模擬器，比如我用的「足」模擬器</span></span>
+<span id="cb84-4"><a href="#cb84-4" aria-hidden="true" tabindex="-1"></a><span class="bu">set</span> <span class="va">$menu</span> bemenu-run <span class="at">-b</span> <span class="at">-n</span> <span class="at">-fn</span> iosevka:10 <span class="at">--tb</span> <span class="st">&quot;#00000000&quot;</span> <span class="at">--fb</span> <span class="st">&quot;#00000000&quot;</span> <span class="at">--cb</span> <span class="st">&quot;#00000000&quot;</span> <span class="at">--nb</span> <span class="st">&quot;#00000000&quot;</span> <span class="at">--hb</span> <span class="st">&quot;#00000000&quot;</span> <span class="at">--fbb</span> <span class="st">&quot;#00000000&quot;</span> <span class="at">--sb</span> <span class="st">&quot;#09ABAC5A&quot;</span> <span class="at">--ab</span> <span class="st">&quot;#00000000&quot;</span> <span class="at">--scb</span> <span class="st">&quot;#00000000&quot;</span> <span class="at">--tf</span> <span class="st">&quot;#E1E1E1&quot;</span> <span class="at">--border</span> 6 <span class="at">--bdr</span> <span class="st">&quot;#00000000&quot;</span> <span class="at">--width-factor</span> 1 <span class="at">--wrap</span> <span class="at">--prompt</span> <span class="st">&quot;spotlight&quot;</span> <span class="at">--hp</span> 4 <span class="at">--no-spacing</span> <span class="at">--sf</span> <span class="st">&quot;#D9534F&quot;</span> <span class="kw">|</span> <span class="fu">xargs</span> swaymsg exec <span class="at">--</span> <span class="co"># 如果你想讓bemenu背景透明出現在屏幕底部</span></span>
+<span id="cb84-5"><a href="#cb84-5" aria-hidden="true" tabindex="-1"></a><span class="bu">set</span> <span class="va">$lock</span> swaylock <span class="at">-u</span> <span class="at">-e</span> <span class="at">-f</span> <span class="at">-c</span> 00000000 <span class="co"># 去除swaylock的有點強姦審美的解鎖效果（真是越來越懷念slock了），你還可以「讓鎖屏背景透明」什麼的，它支持鎖屏時顯示圖片，你只需要寫一個腳本調用image magick預處理就好</span></span>
+<span id="cb84-6"><a href="#cb84-6" aria-hidden="true" tabindex="-1"></a><span class="ex">for_window</span> [class=<span class="st">&quot;.*&quot;</span>] opacity set 0.84 <span class="co"># 如果你希望讓所有窗口透明</span></span>
+<span id="cb84-7"><a href="#cb84-7" aria-hidden="true" tabindex="-1"></a><span class="ex">for_window</span> [app_id=<span class="st">&quot;mpv&quot;</span>] floating enable, opacity set 1 <span class="co"># 如果你希望對一些窗口特殊對待（我相信你肯定不希望mpv背景是透明的），同時讓它浮動</span></span>
+<span id="cb84-8"><a href="#cb84-8" aria-hidden="true" tabindex="-1"></a><span class="ex">xwayland</span> enabled <span class="co"># 支持X11應用</span></span>
+<span id="cb84-9"><a href="#cb84-9" aria-hidden="true" tabindex="-1"></a><span class="ex">for_window</span> [window_role=<span class="st">&quot;pop-up&quot;</span>] floating enable</span>
+<span id="cb84-10"><a href="#cb84-10" aria-hidden="true" tabindex="-1"></a><span class="ex">for_window</span> [window_role=<span class="st">&quot;bubble&quot;</span>] floating enable</span>
+<span id="cb84-11"><a href="#cb84-11" aria-hidden="true" tabindex="-1"></a><span class="ex">for_window</span> [window_role=<span class="st">&quot;dialog&quot;</span>] floating enable</span>
+<span id="cb84-12"><a href="#cb84-12" aria-hidden="true" tabindex="-1"></a><span class="ex">for_window</span> [window_type=<span class="st">&quot;dialog&quot;</span>] floating enable</span>
+<span id="cb84-13"><a href="#cb84-13" aria-hidden="true" tabindex="-1"></a><span class="ex">for_window</span> [window_role=<span class="st">&quot;task_dialog&quot;</span>] floating enable</span>
+<span id="cb84-14"><a href="#cb84-14" aria-hidden="true" tabindex="-1"></a><span class="ex">for_window</span> [window_type=<span class="st">&quot;menu&quot;</span>] floating enable</span>
+<span id="cb84-15"><a href="#cb84-15" aria-hidden="true" tabindex="-1"></a><span class="ex">for_window</span> [window_type=<span class="st">&quot;notification&quot;</span>] floating enable</span>
+<span id="cb84-16"><a href="#cb84-16" aria-hidden="true" tabindex="-1"></a><span class="ex">for_window</span> [app_id=<span class="st">&quot;floating&quot;</span>] floating enable</span>
+<span id="cb84-17"><a href="#cb84-17" aria-hidden="true" tabindex="-1"></a><span class="ex">for_window</span> [app_id=<span class="st">&quot;floating_update&quot;</span>] floating enable, resize set width 1000px height 600px</span>
+<span id="cb84-18"><a href="#cb84-18" aria-hidden="true" tabindex="-1"></a><span class="ex">for_window</span> [class=<span class="st">&quot;(?i)pinentry&quot;</span>] floating enable</span>
+<span id="cb84-19"><a href="#cb84-19" aria-hidden="true" tabindex="-1"></a><span class="ex">for_window</span> [title=<span class="st">&quot;Administrator privileges required&quot;</span>] floating enable</span>
+<span id="cb84-20"><a href="#cb84-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb84-21"><a href="#cb84-21" aria-hidden="true" tabindex="-1"></a><span class="ex">for_window</span> [title=<span class="st">&quot;About Mizilla Firefox&quot;</span>] floating enable</span>
+<span id="cb84-22"><a href="#cb84-22" aria-hidden="true" tabindex="-1"></a><span class="ex">for_window</span> [window_role=<span class="st">&quot;About&quot;</span>] floating enable</span>
+<span id="cb84-23"><a href="#cb84-23" aria-hidden="true" tabindex="-1"></a><span class="ex">for_window</span> [app_id=<span class="st">&quot;firefox&quot;</span> title=<span class="st">&quot;Library&quot;</span>] floating enable, border none, sticky enable</span>
+<span id="cb84-24"><a href="#cb84-24" aria-hidden="true" tabindex="-1"></a><span class="ex">for_window</span> [title=<span class="st">&quot;Firefox - Sharing Indicator&quot;</span>] kill <span class="co"># 智慧的窗口判斷，Gentoo Wiki上抄的</span></span>
+<span id="cb84-25"><a href="#cb84-25" aria-hidden="true" tabindex="-1"></a><span class="ex">hide_edge_borders</span> smart</span>
+<span id="cb84-26"><a href="#cb84-26" aria-hidden="true" tabindex="-1"></a><span class="ex">gaps</span> inner 6</span>
+<span id="cb84-27"><a href="#cb84-27" aria-hidden="true" tabindex="-1"></a><span class="ex">gaps</span> outer 0</span>
+<span id="cb84-28"><a href="#cb84-28" aria-hidden="true" tabindex="-1"></a><span class="ex">smart_gaps</span> off <span class="co"># 設置邊框間距</span></span>
+<span id="cb84-29"><a href="#cb84-29" aria-hidden="true" tabindex="-1"></a><span class="ex">default_border</span> none</span>
+<span id="cb84-30"><a href="#cb84-30" aria-hidden="true" tabindex="-1"></a><span class="ex">default_floating_border</span> none <span class="co"># 去掉每個窗口的標題欄</span></span>
+<span id="cb84-31"><a href="#cb84-31" aria-hidden="true" tabindex="-1"></a><span class="bu">exec</span> mako <span class="co"># 需要在啓動時啓動的應用，比如你要用fcitx輸入方法，就是exec fcitx5 -d</span></span>
+<span id="cb84-32"><a href="#cb84-32" aria-hidden="true" tabindex="-1"></a><span class="ex">bindsym</span> Print exec grim ~/Images/ps_<span class="va">$(</span><span class="fu">date</span> +<span class="st">&quot;%Y%m%d%H%M%S&quot;</span><span class="va">)</span>.png</span>
+<span id="cb84-33"><a href="#cb84-33" aria-hidden="true" tabindex="-1"></a><span class="ex">bindsym</span> <span class="va">$mod</span>+Print exec grimshot save area ~/Images/psa_<span class="va">$(</span><span class="fu">date</span> +<span class="st">&quot;%Y%m%d%H%M%S&quot;</span><span class="va">)</span>.png <span class="co"># 截屏的快捷鍵</span></span>
+<span id="cb84-34"><a href="#cb84-34" aria-hidden="true" tabindex="-1"></a><span class="ex">bar</span> {</span>
+<span id="cb84-35"><a href="#cb84-35" aria-hidden="true" tabindex="-1"></a>    <span class="ex">status_command</span> waybar</span>
+<span id="cb84-36"><a href="#cb84-36" aria-hidden="true" tabindex="-1"></a>    <span class="ex">mode</span> invisible</span>
+<span id="cb84-37"><a href="#cb84-37" aria-hidden="true" tabindex="-1"></a><span class="er">}</span> <span class="co"># 標題欄使用waybar時的配置</span></span></code></pre></div>
+<p>等等很多其他的配置，建議在<a href="https://swaywm.org/">這裏</a>和<a
+href="https://github.com/swaywm/sway">這裏</a>等地方看看如何配置。</p>
+<p>至於waybar狀態欄，主要就是<code>~/.config/waybar/config</code>和<code>~/.config/waybar/style.css</code>兩個文件。一個語法非常直觀、另一個就是CSS文件，從網上找找別人的配置、看看文檔、抄一抄改一改就好。配色倒是個難題，我從MacOS同樣背景圖片的狀態欄上抄了顏色，感覺不那麼違和了。
+<img src="./aqua-statusbar.png" title="狀態欄顏色抄襲"
+alt="狀態欄顏色來源" /></p>
+<h4 id="常見問題">常見問題</h4>
+<p>我思來想去感覺只有輸入法有點坑了。衆所周知，fcitx5對Wayland的支持是比較好的，然而fcitx5被<code>amd64</code>的關鍵詞矇蔽了。所以在iptm集合里我們需要寫的是：</p>
+<pre class="emerge"><code>app-i18n/fcitx:5
+app-i18n/fcitx-gtk:5 # 一定要注意這個，沒有它在所以基於gtk的軟件下候選彈窗都是沒有的，不知爲什麼fcitx5里包含了qt的但沒gtk
+app-i18n/fcitx-rime:5 # 換成你想用的輸入法（框架）
+app-i18n/fcitx-configtool:5 # 圖像化配置界面，還是建議裝一個的，當然也可以手動編輯那個配置文件或者沿用之前的配置</code></pre>
+<p>然後在<code>~/.bashrc</code>或者類似的什麼地方寫上這些環境變量：</p>
+<div class="sourceCode" id="cb86"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb86-1"><a href="#cb86-1" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">WLR_RENDERER</span><span class="op">=</span>vulkan</span>
+<span id="cb86-2"><a href="#cb86-2" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">GTK_IM_MODULE</span><span class="op">=</span>fcitx <span class="co"># emacs GDK_IS_WAYLAND_DISPLAY assertion fail</span></span>
+<span id="cb86-3"><a href="#cb86-3" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">QT_IM_MODULE</span><span class="op">=</span>fcitx</span>
+<span id="cb86-4"><a href="#cb86-4" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">XMODIFIERS</span><span class="op">=</span>@im=fcitx</span></code></pre></div>
+<p>注意<code>GTK_IM_MODULE</code>這一變量，官方的建議是用<code>wayland</code>的值，但emacs會報錯。所以如果你不用emacs就把它換成<code>wayland</code>。</p>
+<h2 id="吐槽與展望">吐槽與展望</h2>
+<p>Gentoo是1999年10月4日出現的，現在已經2024年了，真的是「20 years of
+compile」，而它很有名的一點就是需要編譯。網上有人用Gentoo把硬盤弄壞的、被懷疑在挖礦的、把主板燒了的，各種各樣。然而就在不久就之前，Gentoo的二進制更成熟了。真是一件大好事（雖然估計對我沒什麼影響就是了）。</p>
+<p>關於Gentoo的安裝，我這裏只是給了一個大概的思路：如果你真的想要用Gentoo的話，Gentoo
+Wiki絕對是你的好夥伴。從電源管理到內核的pgo優化再到如何讀寫中文、如何用QEMU虛擬化。</p>
+<p>本來這裏該寫的是吐槽，但我發現真的沒什麼好說的，只能說希望隨着硬件性能的提升Gentoo能夠憑藉極致的客製化成爲主流發行版之一吧？</p>
+<h2 id="參考文獻以及學習資料">參考文獻以及學習資料</h2>
+<p>很多鏈接都放在文中了，所以這裏不能說還有很多學習資料、只能說一個我都不想寫了。寫文章真累。如果有名詞使用，概念錯誤，或是可以優化的步驟，歡迎評論或者直接發我郵件：<a
+href="j18516785606@icloud.com"><code>j18516785606@icloud.com</code></a>（常用）或<a
+href="RadioNoiseE@gmail.com"><code>RadioNoiseE@gmail.com</code></a>（說實話、這個郵箱我已經幾個月沒查看過了）。</p>
+<p>祝各位都能調教出一個和自己xp的系統。</p>
