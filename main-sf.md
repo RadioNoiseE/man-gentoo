@@ -41,7 +41,7 @@ https://mirrors.tuna.tsinghua.edu.cn/gentoo/releases/amd64/autobuilds/current-in
 随后可以`ping`一下`gentoo.org`，看看自己是否成功联网。然后视需求编辑`/etc/reslov.conf`（可用的编辑器有nano）。
 
 #### 磁盘分区
-接下来是很重要的一步：给目标设备的磁盘分区。（确定你的电脑使用不是BIOS启动，如果是请参考Handbook）一般至少需要三个分区、分别是EFI分区（512MB~1024MB）、swap分区（主要是笔记本电脑休眠时使用，一般等于你的运行时内存大小即可）以及根分区。这里也是，大家各显神通就好；[这里](https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks)（Introduction to block devices至Partitioning the disk with MBR for BIOS / legacy boot）有Gentoo官方给出的方案，以及分区工具`fdisk`的手把手教学可供参考。下面给出我的方案、仅供参考：
+接下来是很重要的一步：给目标设备的磁盘分区。（确保你的电脑使用不是BIOS启动，如果是请参考Handbook）一般至少需要三个分区、分别是EFI分区（512MB~1024MB）、swap分区（主要是笔记本电脑休眠时使用，一般等于你的运行时内存大小即可）以及根分区。这里也是，大家各显神通就好；[这里](https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks)（Introduction to block devices至Partitioning the disk with MBR for BIOS / legacy boot）有Gentoo官方给出的方案，以及分区工具`fdisk`的手把手教学可供参考。下面给出我的方案、仅供参考：
 ```fdisk
 Disk /dev/nvme0n1: 476.94 GiB, 512110190592 bytes, 1000215216 sectors
 Disk model: [.*]
@@ -176,7 +176,7 @@ mount /dev/nvme0n1p2 /boot/efi
 ### BootStrap（可选）
 这时，我们处在了一个由先前下载并解压的stage3构建的一个基础系统中。它包括了标准库、编译器等Linux系统的必要组成部分，是由Gentoo Release Engineering Team（好高级的名字、发行工程诶）帮我们预先编译好的。根据[FAQ](https://wiki.gentoo.org/wiki/FAQ)，从头至尾构建这些所得的收益并不会很大，而所花的时间非常长，特别是如果你的gcc像笔者一样开启了`lto`、`pgo`等特性，对于一般电脑至少需要4小时（甚至gcc就要编译至少3次［至少是因为，如果你的gcc开了`pgo`、那么就需要重复编译5次］）。故读者需要明智地选择是否进行这一步。若不需要则**直接**进入下一部分『选择全局配置文件并安装基础系统』即可。选择该部分的读者在下一部分可忽略重复步骤（笔者将会指明）。
 
-首先我们先同步一下本机的包管理器数据库（其实就是一个在`/var/db/repos/`下的一堆文件）：
+首先我们先同步一下本机的包管理器数据库（其实就是在`/var/db/repos/`下的一堆文件）：
 ```bash
 emerge --sync
 ```
@@ -198,7 +198,7 @@ cd /var/db/repos/gentoo/scripts
 ```
 
 #### 从stage2到stage3
-理论上按照Gentoo官方的说法，这一步只需要`emerge -e @system`构建系统工具链即可。然而由于那个bootstrap.sh脚本估计是没怎么维护了，出来的gcc编译器缺少构建系统所需的一个特性、需要手动使用`USE=openmp`开启。这一步你也可以配置更多gcc的特性，详见[这里](https://wiki.gentoo.org/wiki/GCC)。为了开启这些特性，我们需要在`/etc/portage/package.use/`目录下创建一个文件（文件名无所谓，但为了可维护性有两种广泛使用的方案：创建一个文件存放所有软件的`USE`配置和为每一个需要配置的软件创建一个新文件），并写入：
+理论上按照Gentoo官方的说法，这一步只需要`emerge -e @system`构建系统工具链即可。然而由于那个bootstrap.sh脚本估计是没怎么维护了，出来的gcc编译器缺少构建系统所需的一个特性、需要手动使用`USE=openmp`开启。这一步你也可以配置更多gcc的特性，详见[这里](https://wiki.gentoo.org/wiki/GCC)。为了开启这些特性，我们需要在`/etc/portage/package.use/`目录下创建一个文件（文件名无所谓，但为了可维护性有两种广泛使用的方案：创建一个文件存放所有软件的`USE`配置和为每一个需要配置的软件创建一个新文件）并写入：
 ```
 sys-devel/gcc openmp
 ```
@@ -250,8 +250,7 @@ echo "VIDEO_CARDS=\"intel\"" >> /etc/portage/make.conf
 这一步是可选的，且只在你做出了：
 1. 修改全局的`USE`旗标后；
 2. 出尔反尔、做出了跟你在选取stage3文件时截然相反地选择（比如从OpenRC投向了Systemd）；
-3. 不赶时间、生活比较从容
-时才会带来好处。如果你赶时间，即使你做出了1、2中的行为也可以闲适自得地跳过这步，因为可能会需要一段等待的时间。
+3. 不赶时间、生活比较从容时才会带来好处。如果你赶时间，即使你做出了1、2中的行为也可以闲适自得地跳过这步，因为可能会需要一段等待的时间；
 
 如果坚定信念决定重建，执行：
 ```bash
@@ -264,7 +263,7 @@ emerge --ask --depclean
 移除不被依赖的软件包（这步十分残忍、请确认后再确认）。
 
 #### 本地化
-从这一节开始，就需要区分OpenRC和Systemd各自的步骤。笔者用的是OpenRC，使用Systemd的用家可以从[这里](https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Base)的Optional: Using systemd as the system and service manager处开始按步骤使用不同的命令完成安装（两种方案在安装时只会有细节上的区别）。
+从这一节开始，就需要区分OpenRC和Systemd各自的步骤。笔者用的是OpenRC，使用Systemd的用户可以从[这里](https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Base)的Optional: Using systemd as the system and service manager处开始按步骤使用不同的命令完成安装（两种方案在安装时只会有细节上的区别）。
 
 首先我们设定时区，使用以下命令查看可用时区：
 ```bash
@@ -339,7 +338,7 @@ touch /etc/portage/sets/kernel
 echo "sys-kernel/gentoo-sources" >> /etc/portage/sets/kernel # 内核源文件
 echo "sys-kernel/dracut" >> /etc/portage/sets/kernel # initramfs
 ```
-Gentoo提供了许多内核，比如没有对Gentoo进行适配的vanilla、性能优化的zen、以及其他的分支，根据喜好／需求选择即可。至于用来生成initramfs的dracut，也可以用官方的genkernel替代；但需要注意的是genkernel至今为提供对plymouth的支持。
+Gentoo提供了许多内核，比如没有对Gentoo进行适配的vanilla、性能优化的zen、以及其他的分支，根据喜好／需求选择即可。至于用来生成initramfs的dracut，也可以用官方的genkernel替代；但需要注意的是genkernel至今未提供对plymouth的支持。
 
 使用`emerge -a @kernel`安装后，即可开始配置：
 ```bash
@@ -679,7 +678,7 @@ else
     exit 1
 fi
 ```
-即可。如果你有需要在进入桌面环境时启动的程式（如fcitx），可以选择在这里添加，但更建议使用XMonad的`XMonad.Util.SpawnOnce`进行配置。
+即可。如果你有需要在进入桌面环境时启动的程序（如fcitx），可以选择在这里添加，但更建议使用XMonad的`XMonad.Util.SpawnOnce`进行配置。
 
 随后我们先配置XMonad和XMobar，请参考[官方教程](https://xmonad.org/TUTORIAL.html)，应该不需要Haskell基础。对于上述安装的辅助软件，这里有一个适配的基础配置：
 ```haskell

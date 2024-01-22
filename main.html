@@ -164,7 +164,7 @@ class="sourceCode bash"><code class="sourceCode bash"><span id="cb14-1"><a href=
 Release Engineering
 Team（好高級的名字、發行工程誒）幫我們預先編譯好的。根據<a
 href="https://wiki.gentoo.org/wiki/FAQ">FAQ</a>，從頭至尾構建這些所得的收益並不會很大，而所花的時間非常長，特別是如果你的gcc像筆者一樣開啓了<code>lto</code>、<code>pgo</code>等特性，對於一般電腦至少需要4小時（甚至gcc就要編譯至少3次［至少是因爲，如果你的gcc開了<code>pgo</code>、那麼就需要重複編譯5次］）。故讀者需要明智地選擇是否進行這一步。若不需要則<strong>直接</strong>進入下一部分『選擇全局配置文件並安裝基礎系統』即可。選擇該部分的讀者在下一部分可忽略重複步驟（筆者將會指明）。</p>
-<p>首先我們先同步一下本機的包管理器數據庫（其實就是一個在<code>/var/db/repos/</code>下的一堆文件）：</p>
+<p>首先我們先同步一下本機的包管理器數據庫（其實就是在<code>/var/db/repos/</code>下的一堆文件）：</p>
 <div class="sourceCode" id="cb15"><pre
 class="sourceCode bash"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">--sync</span></span></code></pre></div>
 <p>隨後選取你要使用的基礎系統配置文件，他們是Gentoo系統構建的磚塊。（根據Handbook，）它不僅幫你決定了<code>USE</code>、<code>CFLAGS</code>等的值，更限定了系統上軟件包的版本。根據你在選stage3時和實際需求選擇即可。使用：</p>
@@ -183,7 +183,7 @@ class="sourceCode bash"><code class="sourceCode bash"><span id="cb18-1"><a href=
 <span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="ex">./bootstrap.sh</span></span></code></pre></div>
 <h4 id="從stage2到stage3">從stage2到stage3</h4>
 <p>理論上按照Gentoo官方的說法，這一步只需要<code>emerge -e @system</code>構建系統工具鏈即可。然而由於那個bootstrap.sh腳本估計是沒怎麼維護了，出來的gcc編譯器缺少構建系統所需的一個特性、需要手動使用<code>USE=openmp</code>開啓。這一步你也可以配置更多gcc的特性，詳見<a
-href="https://wiki.gentoo.org/wiki/GCC">這裏</a>。爲了開啓這些特性，我們需要在<code>/etc/portage/package.use/</code>目錄下創建一個文件（文件名無所謂，但爲了可維護性有兩種廣泛使用的方案：創建一個文件存放所有軟件的<code>USE</code>配置和爲每一個需要配置的軟件創建一個新文件），並寫入：</p>
+href="https://wiki.gentoo.org/wiki/GCC">這裏</a>。爲了開啓這些特性，我們需要在<code>/etc/portage/package.use/</code>目錄下創建一個文件（文件名無所謂，但爲了可維護性有兩種廣泛使用的方案：創建一個文件存放所有軟件的<code>USE</code>配置和爲每一個需要配置的軟件創建一個新文件）並寫入：</p>
 <pre><code>sys-devel/gcc openmp</code></pre>
 <p>即可。（如果軟件名沒有重疊，你也可以省去類名直接寫gcc。）</p>
 <p>隨後使用新的配置重新編譯gcc：</p>
@@ -224,8 +224,7 @@ href="https://wiki.gentoo.org/wiki/NVIDIA">閉源</a>。（還是老黃有牌面
 <p>這一步是可選的，且只在你做出了： 1.
 修改全局的<code>USE</code>旗標後； 2.
 出爾反爾、做出了跟你在選取stage3文件時截然相反地選擇（比如從OpenRC投向了Systemd）；
-3. 不趕時間、生活比較從容
-時纔會帶來好處。如果你趕時間，即使你做出了1、2中的行爲也可以閒適自得地跳過這步，因爲可能會需要一段等待的時間。</p>
+3. 不趕時間、生活比較從容時纔會帶來好處。如果你趕時間，即使你做出了1、2中的行爲也可以閒適自得地跳過這步，因爲可能會需要一段等待的時間。</p>
 <p>如果堅定信念決定重建，執行：</p>
 <div class="sourceCode" id="cb26"><pre
 class="sourceCode bash"><code class="sourceCode bash"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">-avuDN</span> @world</span></code></pre></div>
