@@ -27,7 +27,7 @@
 ### 准备安装环境
 
 #### 引导
-为了完成Gentoo Linux的安装、首先我们肯定要制作一个系统引导盘（LiveUSB）。Gentoo Linux的安装跟大部分发行版不同之处就在于它并没有提供一个有GUI或TUI界面作为安装向导的引导盘。相反，为了最大程度地客制化，它只提供了一个内置各种安装系统必备工具的不包含图形界面的基础系统；我们需要在以LiveUSB启动后`chroot`至本机磁盘手动（一般情况下）完成安装。这种繁琐安装方式给予了其最大的灵活性，真正意义上的选择之多样是Gentoo一个非常大的优势。
+为了完成Gentoo Linux的安装、首先我们肯定要制作一个系统引导盘（LiveUSB）。Gentoo Linux的安装跟大部分发行版的不同之处就在于它并没有提供一个有GUI或TUI界面作为安装向导的引导盘。相反，为了最大程度地客制化，它只提供了一个内置各种安装系统必备工具的不包含图形界面的基础系统；我们需要在以LiveUSB启动后`chroot`至本机磁盘手动（一般情况下）完成安装。这种繁琐安装方式给予了其最大的灵活性，真正意义上的选择之多样是Gentoo一个非常大的优势。
 
 我们可以从清华镜像源处获得LiveUSB的磁盘映像文件。官方提供了三种磁盘文件，这里我们一般选择`install-amd64-mininal`即可，文件地址在：
 ```
@@ -38,10 +38,10 @@ https://mirrors.tuna.tsinghua.edu.cn/gentoo/releases/amd64/autobuilds/current-in
 #### 连接至网络
 进入LiveUSB的环境后，先运行`ifconfig`，看看除了`lo`之外是否有别的网卡设备被检测到（比如`wlan`）。如果没有那说明你的网卡不被支持，可以到互联网上检索并寻求帮助。有的话就可以运行`net-setup`（自带的一个非常贴心的脚本），按照指引连接至网络。如果使用`wlan`，大部分网络都是WPA2/3，并建议让`dhcp`决定ip地址。
 
-随后可以`ping`一下`gentoo.org`，看看自己是否成功联网。然后视需求编辑`/etc/reslov.conf`（可用的编辑器有nano）。
+随后可以`ping`一下`gentoo.org`，看看自己是否成功联网。然后视需求编辑`/etc/reslov.conf`（默认可用的编辑器有nano）。
 
 #### 磁盘分区
-接下来是很重要的一步：给目标设备的磁盘分区。（确保你的电脑使用不是BIOS启动，如果是请参考Handbook）一般至少需要三个分区、分别是EFI分区（512MB~1024MB）、swap分区（主要是笔记本电脑休眠时使用，一般等于你的运行时内存大小即可）以及根分区。这里也是，大家各显神通就好；[这里](https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks)（Introduction to block devices至Partitioning the disk with MBR for BIOS / legacy boot）有Gentoo官方给出的方案，以及分区工具`fdisk`的手把手教学可供参考。下面给出我的方案、仅供参考：
+接下来是很重要的一步：给目标设备的磁盘分区。（确定你的电脑使用不是BIOS启动，如果是请参考Handbook）一般至少需要三个分区、分别是EFI分区（512MB~1024MB）、swap分区（主要是笔记本电脑休眠时使用，一般等于你的运行时内存大小即可）以及根分区。这里也是，大家各显神通就好；[这里](https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks)（Introduction to block devices至Partitioning the disk with MBR for BIOS / legacy boot）有Gentoo官方给出的方案，以及分区工具`fdisk`的手把手教学可供参考。下面给出我的方案、仅供参考：
 ```fdisk
 Disk /dev/nvme0n1: 476.94 GiB, 512110190592 bytes, 1000215216 sectors
 Disk model: [.*]
@@ -77,7 +77,7 @@ cd /mnt/gentoo
 关于stage3，他们是Gentoo系统安装的种子。这时你需要作出选择：
 - 不喜`systemd`？选择`OpenRC`；
 - 对`glibc`感到不适？选择`musl-llvm`（注意，没有gcc和`glibc`一堆软件是编译不起来的）；
-- 被迫还妄想症？选择~~OpenBSD（划掉）~~`hardened-selinux`；
+- 被迫害妄想症？选择~~OpenBSD（划掉）~~`hardened-selinux`；
 - 喜欢禁欲？选择`nomultilib`。
 
 时辰已到，请选择你的毒药。stage3清单可在[这里](https://mirrors.tuna.tsinghua.edu.cn/gentoo/releases/amd64/autobuilds/)查看。
@@ -86,7 +86,7 @@ cd /mnt/gentoo
 ```
 wget https://mirrors.tuna.tsinghua.edu.cn/gentoo/releases/amd64/autobuilds/current-stage3-amd64-desktop-openrc/stage3-amd64-desktop-openrc-*.tar.xz
 ```
-即可。谨慎的读者这时又可以校验一下磁盘映像文件的完整性。
+即可。谨慎的读者这时又可以校验一下磁盘映像文件的完整性了。
 
 然后使用：
 ```
@@ -263,13 +263,13 @@ emerge --ask --depclean
 移除不被依赖的软件包（这步十分残忍、请确认后再确认）。
 
 #### 本地化
-从这一节开始，就需要区分OpenRC和Systemd各自的步骤。笔者用的是OpenRC，使用Systemd的用户可以从[这里](https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Base)的Optional: Using systemd as the system and service manager处开始按步骤使用不同的命令完成安装（两种方案在安装时只会有细节上的区别）。
+从这一节开始，就需要区分OpenRC和Systemd各自的步骤。笔者用的是OpenRC，使用Systemd的用家可以从[这里](https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Base)的Optional: Using systemd as the system and service manager处开始按步骤使用不同的命令完成安装（两种方案在安装时只会有细节上的区别）。
 
 首先我们设定时区，使用以下命令查看可用时区：
 ```bash
 ls -l /usr/share/zoneinfo
 ```
-所谓时区其实就是这个目录下的目录中细分的文件，非常符合所谓的Unix哲学、这很好。然后应用：
+所谓时区其实就是这个目录下的类目录中细分的文件，非常符合所谓的Unix哲学、这很好。然后应用：
 ```bash
 echo "Asia/Shanghai" > /etc/timezone
 emerge --config sys-libs/timezone-data
@@ -314,7 +314,7 @@ emerge --ask @firmware
 #### 发行版内核安装
 以下是使用GNU GRUB作为系统引导时的安装步骤，如果有特殊需求参考[这里](https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Kernel)的Distribution kernels一节即可。
 
-首先我们要安装installkernel这个包。如果你有在内核升级后自动帮你运行`grub-mkconfig`指令的话，需要打开该包的`grub`特性：
+首先我们要安装installkernel这个包。如果你有在内核升级后自动帮你运行`grub-mkconfig`指令的需求的话，需要打开该包的`grub`特性：
 ```bash
 touch /etc/portage/package.use/installkernel
 echo "sys-kernel/installkernel grub" >> /etc/portage/package.use/installkernel
@@ -338,7 +338,7 @@ touch /etc/portage/sets/kernel
 echo "sys-kernel/gentoo-sources" >> /etc/portage/sets/kernel # 内核源文件
 echo "sys-kernel/dracut" >> /etc/portage/sets/kernel # initramfs
 ```
-Gentoo提供了许多内核，比如没有对Gentoo进行适配的vanilla、性能优化的zen、以及其他的分支，根据喜好／需求选择即可。至于用来生成initramfs的dracut，也可以用官方的genkernel替代；但需要注意的是genkernel至今未提供对plymouth的支持。
+Gentoo提供了许多内核，比如没有对Gentoo进行适配的vanilla、性能优化的zen、以及其他的分支，根据喜好／需求选择即可。至于用来生成initramfs的dracut，也可以用官方的genkernel替代；但需要注意的是genkernel至今为提供对plymouth的支持。
 
 使用`emerge -a @kernel`安装后，即可开始配置：
 ```bash
@@ -386,9 +386,9 @@ Cryptographic API  --->
         [*] PKCS#7 message parser
         <M> PKCS#8 private key parser                   // linux kernel 4.20 or higher
 ```
-所以在手动配置内核所能带来的精简之外，安装软件时便可能需要额外的折腾，比如iptables、这个东西需要的内核配置特别多，但想要在QEMU里玩游戏还必须配置。如果你的笔记本电脑需要能用的电源管理，别忘了看[这篇电源管理](https://wiki.gentoo.org/wiki/Power_management/Guide)（建议别现麻烦，把`thermald`配一下）和[这篇关于休眠](https://wiki.gentoo.org/wiki/Suspend_and_hibernate)的文章。同时也注意一下时钟滴答、频率这些对性能影响较大的选项。
+所以在手动配置内核所能带来的精简之外，安装软件时便可能需要额外的折腾，比如iptables、这个东西需要的内核配置特别多，但想要在QEMU里玩游戏还必须配置。如果你的笔记本电脑需要能用的电源管理，别忘了看[这篇电源管理](https://wiki.gentoo.org/wiki/Power_management/Guide)（建议别嫌麻烦，把`thermald`配一下）和[这篇关于休眠](https://wiki.gentoo.org/wiki/Suspend_and_hibernate)的文章。同时也注意一下时钟滴答模型、频率这些对性能影响较大的选项。
 
-在大显神通之后，想必各位也完成了配置。推出menuconfig界面并保存之后，你的配置会被写入当前目录下的`.config`文件中。接下来使用：
+在大显神通之后，想必各位也完成了配置。退出menuconfig界面并保存之后，你的配置会被写入当前目录下的`.config`文件中。接下来使用：
 ```bash
 make -j11 # 根据自己硬件调整
 make modules_install
@@ -443,7 +443,7 @@ rc-update add iwd default
 
 然后各位视需求编辑一下`/etc/hosts`文件即可。
 ```bash
-nano /etc/hosts # 预装的编辑器是nano、觉得苦手可以用emerge装来用
+nano /etc/hosts # 预装的编辑器是nano、觉得苦手可以用emerge装别的（终端下可用的）来用
 ```
 
 #### 系统信息
@@ -501,7 +501,7 @@ chmod -c 0400 /etc/doas.conf
 ```bash
 permit nopass :wheel # 危险，除非你知道你在做什么，否则不要照抄
 ```
-因为除了我之外不会有人碰我电脑，我也不是Linux运维什么的，所以的设置的是只要用户在wheel组里无需密码就可以用doas获得root权限。
+因为除了我之外不会有人碰我电脑，我也不是从事高危行业的，所以设置是只要用户在wheel组里无需密码就可以用doas获得root权限。
 
 最后如果你希望你的开机界面好看一点、可以安装plymouth：
 ```bash
@@ -521,11 +521,11 @@ diff="diff --color=always -Nu '%s' '%s'"
 ```
 就好了。你还可以选择其它的diff工具，但完全没必要（这些自动生成的规则能有多复杂）。
 
-回到plymouth，执行一下命令来选择你需要使用的启动画面：
+回到plymouth，执行以下命令来选择你需要使用的启动画面：
 ```bash
 plymouth-set-default-theme -l
 ```
-然后选择你要使用的后重新生成initramfs：
+选择你要使用的后重新生成initramfs：
 ```bash
 plymouth-set-default-theme details
 dracut --force --hostonly
@@ -678,7 +678,7 @@ else
     exit 1
 fi
 ```
-即可。如果你有需要在进入桌面环境时启动的程序（如fcitx），可以选择在这里添加，但更建议使用XMonad的`XMonad.Util.SpawnOnce`进行配置。
+即可。如果你有需要在进入桌面环境时启动的程式（如fcitx），可以选择在这里添加，但更建议使用XMonad的`XMonad.Util.SpawnOnce`进行配置。
 
 随后我们先配置XMonad和XMobar，请参考[官方教程](https://xmonad.org/TUTORIAL.html)，应该不需要Haskell基础。对于上述安装的辅助软件，这里有一个适配的基础配置：
 ```haskell
@@ -928,6 +928,11 @@ bar {
 
 至于waybar状态栏，主要就是`~/.config/waybar/config`和`~/.config/waybar/style.css`两个文件。一个语法非常直观、另一个就是CSS文件，从网上找找别人的配置、看看文档、抄一抄改一改就好。配色倒是个难题，我从MacOS同样背景图片的状态栏上抄了颜色，感觉不那么违和了。
 ![状态栏颜色来源](./aqua-statusbar.png "状态栏颜色抄袭")
+
+如果你希望用Vulkan代替默认的OpenGL（`gles2`），则还需要在`~/.bashrc`或者别的什么地方加上：
+```bash
+export WLR_RENDERER=vulkan
+```
 
 #### 常见问题
 我思来想去感觉只有输入法有点坑了。众所周知，fcitx5对Wayland的支持是比较好的，然而fcitx5被`amd64`的关键词蒙蔽了。所以在iptm集合里我们需要写的是：

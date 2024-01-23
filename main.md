@@ -27,7 +27,7 @@
 ### 準備安裝環境
 
 #### 引導
-爲了完成Gentoo Linux的安裝、首先我們肯定要製作一個系統引導盤（LiveUSB）。Gentoo Linux的安裝跟大部分發行版不同之處就在於它並沒有提供一個有GUI或TUI界面作爲安裝向導的引導盤。相反，爲了最大程度地客製化，它只提供了一個內置各種安裝系統必備工具的不包含圖形界面的基礎系統；我們需要在以LiveUSB啓動後`chroot`至本機磁盤手動（一般情況下）完成安裝。這種繁瑣安裝方式給予了其最大的靈活性，真正意義上的選擇之多樣是Gentoo一個非常大的優勢。
+爲了完成Gentoo Linux的安裝、首先我們肯定要製作一個系統引導盤（LiveUSB）。Gentoo Linux的安裝跟大部分發行版的不同之處就在於它並沒有提供一個有GUI或TUI界面作爲安裝向導的引導盤。相反，爲了最大程度地客製化，它只提供了一個內置各種安裝系統必備工具的不包含圖形界面的基礎系統；我們需要在以LiveUSB啓動後`chroot`至本機磁盤手動（一般情況下）完成安裝。這種繁瑣安裝方式給予了其最大的靈活性，真正意義上的選擇之多樣是Gentoo一個非常大的優勢。
 
 我們可以從清華鏡像源處獲得LiveUSB的磁盤映像文件。官方提供了三種磁盤文件，這裏我們一般選擇`install-amd64-mininal`即可，文件地址在：
 ```
@@ -38,7 +38,7 @@ https://mirrors.tuna.tsinghua.edu.cn/gentoo/releases/amd64/autobuilds/current-in
 #### 連接至網絡
 進入LiveUSB的環境後，先運行`ifconfig`，看看除了`lo`之外是否有別的網卡設備被檢測到（比如`wlan`）。如果沒有那說明你的網卡不被支持，可以到互聯網上檢索並尋求幫助。有的話就可以運行`net-setup`（自帶的一個非常貼心的腳本），按照指引連接至網絡。如果使用`wlan`，大部分網絡都是WPA2/3，並建議讓`dhcp`決定ip地址。
 
-隨後可以`ping`一下`gentoo.org`，看看自己是否成功聯網。然後視需求編輯`/etc/reslov.conf`（可用的編輯器有nano）。
+隨後可以`ping`一下`gentoo.org`，看看自己是否成功聯網。然後視需求編輯`/etc/reslov.conf`（默認可用的編輯器有nano）。
 
 #### 磁盤分區
 接下來是很重要的一步：給目標設備的磁盤分區。（確定你的電腦使用不是BIOS啓動，如果是請參考Handbook）一般至少需要三個分區、分別是EFI分區（512MB~1024MB）、swap分區（主要是筆記本電腦休眠時使用，一般等於你的運行時內存大小即可）以及根分區。這裏也是，大家各顯神通就好；[這裏](https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks)（Introduction to block devices至Partitioning the disk with MBR for BIOS / legacy boot）有Gentoo官方給出的方案，以及分區工具`fdisk`的手把手教學可供參考。下面給出我的方案、僅供參考：
@@ -77,7 +77,7 @@ cd /mnt/gentoo
 關於stage3，他們是Gentoo系統安裝的種子。這時你需要作出選擇：
 - 不喜`systemd`？選擇`OpenRC`；
 - 對`glibc`感到不適？選擇`musl-llvm`（注意，沒有gcc和`glibc`一堆軟件是編譯不起來的）；
-- 被迫還妄想症？選擇~~OpenBSD（劃掉）~~`hardened-selinux`；
+- 被迫害妄想症？選擇~~OpenBSD（劃掉）~~`hardened-selinux`；
 - 喜歡禁慾？選擇`nomultilib`。
 
 時辰已到，請選擇你的毒藥。stage3清單可在[這裏](https://mirrors.tuna.tsinghua.edu.cn/gentoo/releases/amd64/autobuilds/)查看。
@@ -86,7 +86,7 @@ cd /mnt/gentoo
 ```
 wget https://mirrors.tuna.tsinghua.edu.cn/gentoo/releases/amd64/autobuilds/current-stage3-amd64-desktop-openrc/stage3-amd64-desktop-openrc-*.tar.xz
 ```
-即可。謹慎的讀者這時又可以校驗一下磁盤映像文件的完整性。
+即可。謹慎的讀者這時又可以校驗一下磁盤映像文件的完整性了。
 
 然後使用：
 ```
@@ -269,7 +269,7 @@ emerge --ask --depclean
 ```bash
 ls -l /usr/share/zoneinfo
 ```
-所謂時區其實就是這個目錄下的目錄中細分的文件，非常符合所謂的Unix哲學、這很好。然後應用：
+所謂時區其實就是這個目錄下的類目錄中細分的文件，非常符合所謂的Unix哲學、這很好。然後應用：
 ```bash
 echo "Asia/Shanghai" > /etc/timezone
 emerge --config sys-libs/timezone-data
@@ -314,7 +314,7 @@ emerge --ask @firmware
 #### 發行版內核安裝
 以下是使用GNU GRUB作爲系統引導時的安裝步驟，如果有特殊需求參考[這裏](https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Kernel)的Distribution kernels一節即可。
 
-首先我們要安裝installkernel這個包。如果你有在內核升級後自動幫你運行`grub-mkconfig`指令的話，需要打開該包的`grub`特性：
+首先我們要安裝installkernel這個包。如果你有在內核升級後自動幫你運行`grub-mkconfig`指令的需求的話，需要打開該包的`grub`特性：
 ```bash
 touch /etc/portage/package.use/installkernel
 echo "sys-kernel/installkernel grub" >> /etc/portage/package.use/installkernel
@@ -386,9 +386,9 @@ Cryptographic API  --->
         [*] PKCS#7 message parser
         <M> PKCS#8 private key parser                   // linux kernel 4.20 or higher
 ```
-所以在手動配置內核所能帶來的精簡之外，安裝軟件時便可能需要額外的折騰，比如iptables、這個東西需要的內核配置特別多，但想要在QEMU里玩遊戲還必須配置。如果你的筆記本電腦需要能用的電源管理，別忘了看[這篇電源管理](https://wiki.gentoo.org/wiki/Power_management/Guide)（建議別現麻煩，把`thermald`配一下）和[這篇關於休眠](https://wiki.gentoo.org/wiki/Suspend_and_hibernate)的文章。同時也注意一下時鐘滴答、頻率這些對性能影響較大的選項。
+所以在手動配置內核所能帶來的精簡之外，安裝軟件時便可能需要額外的折騰，比如iptables、這個東西需要的內核配置特別多，但想要在QEMU里玩遊戲還必須配置。如果你的筆記本電腦需要能用的電源管理，別忘了看[這篇電源管理](https://wiki.gentoo.org/wiki/Power_management/Guide)（建議別嫌麻煩，把`thermald`配一下）和[這篇關於休眠](https://wiki.gentoo.org/wiki/Suspend_and_hibernate)的文章。同時也注意一下時鐘滴答模型、頻率這些對性能影響較大的選項。
 
-在大顯神通之後，想必各位也完成了配置。推出menuconfig界面並保存之後，你的配置會被寫入當前目錄下的`.config`文件中。接下來使用：
+在大顯神通之後，想必各位也完成了配置。退出menuconfig界面並保存之後，你的配置會被寫入當前目錄下的`.config`文件中。接下來使用：
 ```bash
 make -j11 # 根據自己硬件調整
 make modules_install
@@ -443,7 +443,7 @@ rc-update add iwd default
 
 然後各位視需求編輯一下`/etc/hosts`文件即可。
 ```bash
-nano /etc/hosts # 預裝的編輯器是nano、覺得苦手可以用emerge裝來用
+nano /etc/hosts # 預裝的編輯器是nano、覺得苦手可以用emerge裝別的（終端下可用的）來用
 ```
 
 #### 系統信息
@@ -501,7 +501,7 @@ chmod -c 0400 /etc/doas.conf
 ```bash
 permit nopass :wheel # 危險，除非你知道你在做什麼，否則不要照抄
 ```
-因爲除了我之外不會有人碰我電腦，我也不是Linux運維什麼的，所以的設置的是只要用戶在wheel組里無需密碼就可以用doas獲得root權限。
+因爲除了我之外不會有人碰我電腦，我也不是從事高危行業的，所以設置是只要用戶在wheel組里無需密碼就可以用doas獲得root權限。
 
 最後如果你希望你的開機界面好看一點、可以安裝plymouth：
 ```bash
@@ -521,11 +521,11 @@ diff="diff --color=always -Nu '%s' '%s'"
 ```
 就好了。你還可以選擇其它的diff工具，但完全沒必要（這些自動生成的規則能有多複雜）。
 
-回到plymouth，執行一下命令來選擇你需要使用的啓動畫面：
+回到plymouth，執行以下命令來選擇你需要使用的啓動畫面：
 ```bash
 plymouth-set-default-theme -l
 ```
-然後選擇你要使用的後重新生成initramfs：
+選擇你要使用的後重新生成initramfs：
 ```bash
 plymouth-set-default-theme details
 dracut --force --hostonly
@@ -928,6 +928,11 @@ bar {
 
 至於waybar狀態欄，主要就是`~/.config/waybar/config`和`~/.config/waybar/style.css`兩個文件。一個語法非常直觀、另一個就是CSS文件，從網上找找別人的配置、看看文檔、抄一抄改一改就好。配色倒是個難題，我從MacOS同樣背景圖片的狀態欄上抄了顏色，感覺不那麼違和了。
 ![狀態欄顏色來源](./aqua-statusbar.png "狀態欄顏色抄襲")
+
+如果你希望用Vulkan代替默認的OpenGL（`gles2`），則還需要在`~/.bashrc`或者別的什麼地方加上：
+```bash
+export WLR_RENDERER=vulkan
+```
 
 #### 常見問題
 我思來想去感覺只有輸入法有點坑了。衆所周知，fcitx5對Wayland的支持是比較好的，然而fcitx5被`amd64`的關鍵詞矇蔽了。所以在iptm集合里我們需要寫的是：

@@ -36,14 +36,14 @@ Handbook</a>，請確保在安裝之前／之後閱讀該官方手冊（建議�
 <h4 id="引導">引導</h4>
 <p>爲了完成Gentoo
 Linux的安裝、首先我們肯定要製作一個系統引導盤（LiveUSB）。Gentoo
-Linux的安裝跟大部分發行版不同之處就在於它並沒有提供一個有GUI或TUI界面作爲安裝向導的引導盤。相反，爲了最大程度地客製化，它只提供了一個內置各種安裝系統必備工具的不包含圖形界面的基礎系統；我們需要在以LiveUSB啓動後<code>chroot</code>至本機磁盤手動（一般情況下）完成安裝。這種繁瑣安裝方式給予了其最大的靈活性，真正意義上的選擇之多樣是Gentoo一個非常大的優勢。</p>
+Linux的安裝跟大部分發行版的不同之處就在於它並沒有提供一個有GUI或TUI界面作爲安裝向導的引導盤。相反，爲了最大程度地客製化，它只提供了一個內置各種安裝系統必備工具的不包含圖形界面的基礎系統；我們需要在以LiveUSB啓動後<code>chroot</code>至本機磁盤手動（一般情況下）完成安裝。這種繁瑣安裝方式給予了其最大的靈活性，真正意義上的選擇之多樣是Gentoo一個非常大的優勢。</p>
 <p>我們可以從清華鏡像源處獲得LiveUSB的磁盤映像文件。官方提供了三種磁盤文件，這裏我們一般選擇<code>install-amd64-mininal</code>即可，文件地址在：</p>
 <pre><code>https://mirrors.tuna.tsinghua.edu.cn/gentoo/releases/amd64/autobuilds/current-install-amd64-minimal/.</code></pre>
 <p>隨後將該<code>iso</code>文件刻錄到U盤上（經過了Hybrid處理，可以直接刻錄到U盤上，不像FreeBSD）。這裏大家各顯神通就好。謹慎的讀者還可以校驗一下磁盤映像文件的完整性、校驗文件也在上面給出的地址下。之後將目標設備關機、插上製作好的引導盤後<strong>先關閉SecureBoot後</strong>啓動。然後你會看到OpenRC引導這Gentoo
 Linux啓動，至此我們就完成了第一步：引導。</p>
 <h4 id="連接至網絡">連接至網絡</h4>
 <p>進入LiveUSB的環境後，先運行<code>ifconfig</code>，看看除了<code>lo</code>之外是否有別的網卡設備被檢測到（比如<code>wlan</code>）。如果沒有那說明你的網卡不被支持，可以到互聯網上檢索並尋求幫助。有的話就可以運行<code>net-setup</code>（自帶的一個非常貼心的腳本），按照指引連接至網絡。如果使用<code>wlan</code>，大部分網絡都是WPA2/3，並建議讓<code>dhcp</code>決定ip地址。</p>
-<p>隨後可以<code>ping</code>一下<code>gentoo.org</code>，看看自己是否成功聯網。然後視需求編輯<code>/etc/reslov.conf</code>（可用的編輯器有nano）。</p>
+<p>隨後可以<code>ping</code>一下<code>gentoo.org</code>，看看自己是否成功聯網。然後視需求編輯<code>/etc/reslov.conf</code>（默認可用的編輯器有nano）。</p>
 <h4 id="磁盤分區">磁盤分區</h4>
 <p>接下來是很重要的一步：給目標設備的磁盤分區。（確定你的電腦使用不是BIOS啓動，如果是請參考Handbook）一般至少需要三個分區、分別是EFI分區（512MB~1024MB）、swap分區（主要是筆記本電腦休眠時使用，一般等於你的運行時內存大小即可）以及根分區。這裏也是，大家各顯神通就好；<a
 href="https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Disks">這裏</a>（Introduction
@@ -82,13 +82,13 @@ Handbook。</p>
 不喜<code>systemd</code>？選擇<code>OpenRC</code>； -
 對<code>glibc</code>感到不適？選擇<code>musl-llvm</code>（注意，沒有gcc和<code>glibc</code>一堆軟件是編譯不起來的）；
 -
-被迫還妄想症？選擇<del>OpenBSD（劃掉）</del><code>hardened-selinux</code>；
+被迫害妄想症？選擇<del>OpenBSD（劃掉）</del><code>hardened-selinux</code>；
 - 喜歡禁慾？選擇<code>nomultilib</code>。</p>
 <p>時辰已到，請選擇你的毒藥。stage3清單可在<a
 href="https://mirrors.tuna.tsinghua.edu.cn/gentoo/releases/amd64/autobuilds/">這裏</a>查看。</p>
 <p>作出選擇後可使用wget或cURL將其下載到<code>/mnt/gentoo</code>下：</p>
 <pre><code>wget https://mirrors.tuna.tsinghua.edu.cn/gentoo/releases/amd64/autobuilds/current-stage3-amd64-desktop-openrc/stage3-amd64-desktop-openrc-*.tar.xz</code></pre>
-<p>即可。謹慎的讀者這時又可以校驗一下磁盤映像文件的完整性。</p>
+<p>即可。謹慎的讀者這時又可以校驗一下磁盤映像文件的完整性了。</p>
 <p>然後使用：</p>
 <pre><code>tar xpvf stage3-*.tar.xz --xattrs-include=&#39;*.*&#39; --numeric-owner</code></pre>
 <p>解壓。注意，一定要用這個命令解壓。參數解釋在Handbook中有，按需食用。</p>
@@ -224,7 +224,8 @@ href="https://wiki.gentoo.org/wiki/NVIDIA">閉源</a>。（還是老黃有牌面
 <p>這一步是可選的，且只在你做出了： 1.
 修改全局的<code>USE</code>旗標後； 2.
 出爾反爾、做出了跟你在選取stage3文件時截然相反地選擇（比如從OpenRC投向了Systemd）；
-3. 不趕時間、生活比較從容時纔會帶來好處。如果你趕時間，即使你做出了1、2中的行爲也可以閒適自得地跳過這步，因爲可能會需要一段等待的時間。</p>
+3.
+不趕時間、生活比較從容時纔會帶來好處。如果你趕時間，即使你做出了1、2中的行爲也可以閒適自得地跳過這步，因爲可能會需要一段等待的時間；</p>
 <p>如果堅定信念決定重建，執行：</p>
 <div class="sourceCode" id="cb26"><pre
 class="sourceCode bash"><code class="sourceCode bash"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">-avuDN</span> @world</span></code></pre></div>
@@ -240,7 +241,7 @@ manager處開始按步驟使用不同的命令完成安裝（兩種方案在安�
 <p>首先我們設定時區，使用以下命令查看可用時區：</p>
 <div class="sourceCode" id="cb28"><pre
 class="sourceCode bash"><code class="sourceCode bash"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ls</span> <span class="at">-l</span> /usr/share/zoneinfo</span></code></pre></div>
-<p>所謂時區其實就是這個目錄下的目錄中細分的文件，非常符合所謂的Unix哲學、這很好。然後應用：</p>
+<p>所謂時區其實就是這個目錄下的類目錄中細分的文件，非常符合所謂的Unix哲學、這很好。然後應用：</p>
 <div class="sourceCode" id="cb29"><pre
 class="sourceCode bash"><code class="sourceCode bash"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;Asia/Shanghai&quot;</span> <span class="op">&gt;</span> /etc/timezone</span>
 <span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a><span class="ex">emerge</span> <span class="at">--config</span> sys-libs/timezone-data</span></code></pre></div>
@@ -276,7 +277,7 @@ class="sourceCode bash"><code class="sourceCode bash"><span id="cb34-1"><a href=
 <p>以下是使用GNU GRUB作爲系統引導時的安裝步驟，如果有特殊需求參考<a
 href="https://wiki.gentoo.org/wiki/Handbook:AMD64/Installation/Kernel">這裏</a>的Distribution
 kernels一節即可。</p>
-<p>首先我們要安裝installkernel這個包。如果你有在內核升級後自動幫你運行<code>grub-mkconfig</code>指令的話，需要打開該包的<code>grub</code>特性：</p>
+<p>首先我們要安裝installkernel這個包。如果你有在內核升級後自動幫你運行<code>grub-mkconfig</code>指令的需求的話，需要打開該包的<code>grub</code>特性：</p>
 <div class="sourceCode" id="cb35"><pre
 class="sourceCode bash"><code class="sourceCode bash"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="fu">touch</span> /etc/portage/package.use/installkernel</span>
 <span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;sys-kernel/installkernel grub&quot;</span> <span class="op">&gt;&gt;</span> /etc/portage/package.use/installkernel</span></code></pre></div>
@@ -343,9 +344,9 @@ Cryptographic API  ---&gt;
         [*] PKCS#7 message parser
         &lt;M&gt; PKCS#8 private key parser                   // linux kernel 4.20 or higher</code></pre>
 <p>所以在手動配置內核所能帶來的精簡之外，安裝軟件時便可能需要額外的折騰，比如iptables、這個東西需要的內核配置特別多，但想要在QEMU里玩遊戲還必須配置。如果你的筆記本電腦需要能用的電源管理，別忘了看<a
-href="https://wiki.gentoo.org/wiki/Power_management/Guide">這篇電源管理</a>（建議別現麻煩，把<code>thermald</code>配一下）和<a
-href="https://wiki.gentoo.org/wiki/Suspend_and_hibernate">這篇關於休眠</a>的文章。同時也注意一下時鐘滴答、頻率這些對性能影響較大的選項。</p>
-<p>在大顯神通之後，想必各位也完成了配置。推出menuconfig界面並保存之後，你的配置會被寫入當前目錄下的<code>.config</code>文件中。接下來使用：</p>
+href="https://wiki.gentoo.org/wiki/Power_management/Guide">這篇電源管理</a>（建議別嫌麻煩，把<code>thermald</code>配一下）和<a
+href="https://wiki.gentoo.org/wiki/Suspend_and_hibernate">這篇關於休眠</a>的文章。同時也注意一下時鐘滴答模型、頻率這些對性能影響較大的選項。</p>
+<p>在大顯神通之後，想必各位也完成了配置。退出menuconfig界面並保存之後，你的配置會被寫入當前目錄下的<code>.config</code>文件中。接下來使用：</p>
 <div class="sourceCode" id="cb41"><pre
 class="sourceCode bash"><code class="sourceCode bash"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> <span class="at">-j11</span> <span class="co"># 根據自己硬件調整</span></span>
 <span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> modules_install</span>
@@ -387,7 +388,7 @@ class="sourceCode bash"><code class="sourceCode bash"><span id="cb47-1"><a href=
 <p>也推薦Gentoo自己的netifrc、但是就是說我嫌<code>net.wlan0</code>太醜了（其他都是什麼<code>local</code>、<code>consolefont</code>、<code>tlp</code>，風格完全不統一啊）。</p>
 <p>然後各位視需求編輯一下<code>/etc/hosts</code>文件即可。</p>
 <div class="sourceCode" id="cb48"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="fu">nano</span> /etc/hosts <span class="co"># 預裝的編輯器是nano、覺得苦手可以用emerge裝來用</span></span></code></pre></div>
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="fu">nano</span> /etc/hosts <span class="co"># 預裝的編輯器是nano、覺得苦手可以用emerge裝別的（終端下可用的）來用</span></span></code></pre></div>
 <h4 id="系統信息">系統信息</h4>
 <p>首先設置root賬戶的密碼（弱密碼會提醒）：</p>
 <div class="sourceCode" id="cb49"><pre
@@ -428,7 +429,7 @@ class="sourceCode bash"><code class="sourceCode bash"><span id="cb56-1"><a href=
 <p>然後將對doas的配置寫在剛創建的<code>/etc/doas.conf</code>文件中即可：</p>
 <div class="sourceCode" id="cb57"><pre
 class="sourceCode bash"><code class="sourceCode bash"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a><span class="ex">permit</span> nopass :wheel <span class="co"># 危險，除非你知道你在做什麼，否則不要照抄</span></span></code></pre></div>
-<p>因爲除了我之外不會有人碰我電腦，我也不是Linux運維什麼的，所以的設置的是只要用戶在wheel組里無需密碼就可以用doas獲得root權限。</p>
+<p>因爲除了我之外不會有人碰我電腦，我也不是從事高危行業的，所以設置是只要用戶在wheel組里無需密碼就可以用doas獲得root權限。</p>
 <p>最後如果你希望你的開機界面好看一點、可以安裝plymouth：</p>
 <div class="sourceCode" id="cb58"><pre
 class="sourceCode bash"><code class="sourceCode bash"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a><span class="fu">touch</span> /etc/portage/sets/bootsplash <span class="co"># bootsplash集合</span></span>
@@ -442,10 +443,10 @@ class="sourceCode bash"><code class="sourceCode bash"><span id="cb59-1"><a href=
 <p>常用的unmask的工具是<code>dispatch-conf</code>，但有時候會在決定該將更新的規則寫入哪個文件時犯錯誤，所以上面提供了另一種思路。順便，它默認的diff是沒有顏色區分的，這不好；於是我們修改<code>/etc/dispatch-conf.conf</code>文件中的一行爲：</p>
 <pre><code>diff=&quot;diff --color=always -Nu &#39;%s&#39; &#39;%s&#39;&quot;</code></pre>
 <p>就好了。你還可以選擇其它的diff工具，但完全沒必要（這些自動生成的規則能有多複雜）。</p>
-<p>回到plymouth，執行一下命令來選擇你需要使用的啓動畫面：</p>
+<p>回到plymouth，執行以下命令來選擇你需要使用的啓動畫面：</p>
 <div class="sourceCode" id="cb61"><pre
 class="sourceCode bash"><code class="sourceCode bash"><span id="cb61-1"><a href="#cb61-1" aria-hidden="true" tabindex="-1"></a><span class="ex">plymouth-set-default-theme</span> <span class="at">-l</span></span></code></pre></div>
-<p>然後選擇你要使用的後重新生成initramfs：</p>
+<p>選擇你要使用的後重新生成initramfs：</p>
 <div class="sourceCode" id="cb62"><pre
 class="sourceCode bash"><code class="sourceCode bash"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a><span class="ex">plymouth-set-default-theme</span> details</span>
 <span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a><span class="ex">dracut</span> <span class="at">--force</span> <span class="at">--hostonly</span></span></code></pre></div>
@@ -818,6 +819,9 @@ href="https://github.com/swaywm/sway">這裏</a>等地方看看如何配置。</
 <p>至於waybar狀態欄，主要就是<code>~/.config/waybar/config</code>和<code>~/.config/waybar/style.css</code>兩個文件。一個語法非常直觀、另一個就是CSS文件，從網上找找別人的配置、看看文檔、抄一抄改一改就好。配色倒是個難題，我從MacOS同樣背景圖片的狀態欄上抄了顏色，感覺不那麼違和了。
 <img src="./aqua-statusbar.png" title="狀態欄顏色抄襲"
 alt="狀態欄顏色來源" /></p>
+<p>如果你希望用Vulkan代替默認的OpenGL（<code>gles2</code>），則還需要在<code>~/.bashrc</code>或者別的什麼地方加上：</p>
+<div class="sourceCode" id="cb85"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb85-1"><a href="#cb85-1" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">WLR_RENDERER</span><span class="op">=</span>vulkan</span></code></pre></div>
 <h4 id="常見問題">常見問題</h4>
 <p>我思來想去感覺只有輸入法有點坑了。衆所周知，fcitx5對Wayland的支持是比較好的，然而fcitx5被<code>amd64</code>的關鍵詞矇蔽了。所以在iptm集合里我們需要寫的是：</p>
 <pre class="emerge"><code>app-i18n/fcitx:5
@@ -825,11 +829,11 @@ app-i18n/fcitx-gtk:5 # 一定要注意這個，沒有它在所以基於gtk的軟
 app-i18n/fcitx-rime:5 # 換成你想用的輸入法（框架）
 app-i18n/fcitx-configtool:5 # 圖像化配置界面，還是建議裝一個的，當然也可以手動編輯那個配置文件或者沿用之前的配置</code></pre>
 <p>然後在<code>~/.bashrc</code>或者類似的什麼地方寫上這些環境變量：</p>
-<div class="sourceCode" id="cb86"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb86-1"><a href="#cb86-1" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">WLR_RENDERER</span><span class="op">=</span>vulkan</span>
-<span id="cb86-2"><a href="#cb86-2" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">GTK_IM_MODULE</span><span class="op">=</span>fcitx <span class="co"># emacs GDK_IS_WAYLAND_DISPLAY assertion fail</span></span>
-<span id="cb86-3"><a href="#cb86-3" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">QT_IM_MODULE</span><span class="op">=</span>fcitx</span>
-<span id="cb86-4"><a href="#cb86-4" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">XMODIFIERS</span><span class="op">=</span>@im=fcitx</span></code></pre></div>
+<div class="sourceCode" id="cb87"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb87-1"><a href="#cb87-1" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">WLR_RENDERER</span><span class="op">=</span>vulkan</span>
+<span id="cb87-2"><a href="#cb87-2" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">GTK_IM_MODULE</span><span class="op">=</span>fcitx <span class="co"># emacs GDK_IS_WAYLAND_DISPLAY assertion fail</span></span>
+<span id="cb87-3"><a href="#cb87-3" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">QT_IM_MODULE</span><span class="op">=</span>fcitx</span>
+<span id="cb87-4"><a href="#cb87-4" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">XMODIFIERS</span><span class="op">=</span>@im=fcitx</span></code></pre></div>
 <p>注意<code>GTK_IM_MODULE</code>這一變量，官方的建議是用<code>wayland</code>的值，但emacs會報錯。所以如果你不用emacs就把它換成<code>wayland</code>。</p>
 <h2 id="吐槽與展望">吐槽與展望</h2>
 <p>Gentoo是1999年10月4日出現的，現在已經2024年了，真的是「20 years of
